@@ -1,7 +1,7 @@
-``brainmass`` documentation
+``brainfield`` documentation
 ============================
 
-`brainmass <https://github.com/chaobrain/brainmass>`_ implements a
+`brainfield <https://github.com/chaobrain/brainfield>`_ implements a
 
 
 

@@ -18,12 +18,12 @@ import brainunit as u
 import matplotlib.pyplot as plt
 import numpy as np
 
-import brainmass
+import brainfield
 
 
 class TestNoise:
     def test1(self):
-        noise = brainmass.OUProcess(1)
+        noise = brainfield.OUProcess(1)
         noise.init_state()
 
         def step_run(i):

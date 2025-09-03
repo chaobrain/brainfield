@@ -23,7 +23,7 @@ from setuptools import find_packages, setup
 
 # version
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, 'brainmass/', '__init__.py'), 'r') as f:
+with open(os.path.join(here, 'brainfield/', '__init__.py'), 'r') as f:
     init_py = f.read()
 version = re.search('__version__ = "(.*)"', init_py).groups()[0]
 
@@ -38,14 +38,14 @@ packages = find_packages(
         "build*",
         "dev*",
         "dist*",
-        "brainmass.egg-info*",
-        "brainmass/__pycache__*"
+        "brainfield.egg-info*",
+        "brainfield/__pycache__*"
     ]
 )
 
 # setup
 setup(
-    name='brainmass',
+    name='brainfield',
     version=version,
     description='Neural mass model for brain modeling',
     long_description=README,
@@ -55,11 +55,11 @@ setup(
     packages=packages,
     python_requires='>=3.10',
     install_requires=['numpy', 'jax', 'brainstate>=0.1.8', 'brainunit'],
-    url='https://github.com/chaobrain/brainmass',
+    url='https://github.com/chaobrain/brainfield',
     project_urls={
-        "Bug Tracker": "https://github.com/chaobrain/brainmass/issues",
-        "Documentation": "https://brainmass.readthedocs.io/",
-        "Source Code": "https://github.com/chaobrain/brainmass",
+        "Bug Tracker": "https://github.com/chaobrain/brainfield/issues",
+        "Documentation": "https://brainfield.readthedocs.io/",
+        "Source Code": "https://github.com/chaobrain/brainfield",
     },
     extras_require={
         'cpu': ['jax'],

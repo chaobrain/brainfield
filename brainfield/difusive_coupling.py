@@ -35,7 +35,7 @@ class DiffusiveCoupling(brainstate.nn.Module):
     It simulates the following model:
 
     $$
-    \mathrm{current}_i = \sum_j (g_{ij} * x_{D_{ij}} - y_i)
+    \mathrm{current}_i = k * \sum_j (g_{ij} * x_{D_{ij}} - y_i)
     $$
 
     where:
@@ -52,6 +52,8 @@ class DiffusiveCoupling(brainstate.nn.Module):
         The delayed state variable for the target units.
     conn : brainstate.typing.Array
         The connection matrix (1D or 2D array) specifying the coupling strengths between units.
+    k: float
+        The global coupling strength. Default is 1.0.
 
     Attributes
     ----------
@@ -68,12 +70,14 @@ class DiffusiveCoupling(brainstate.nn.Module):
         x: Prefetch,
         y: Prefetch,
         conn: brainstate.typing.Array,
+        k: float = 1.0
     ):
         super().__init__()
         assert isinstance(x, Prefetch), f'The first element must be a Prefetch. But got {type(x)}.'
         assert isinstance(y, Prefetch), f'The second element must be a Prefetch. But got {type(y)}.'
         self.x = x
         self.y = y
+        self.k = k
 
         # Connection matrix
         self.conn = u.math.asarray(conn)
@@ -88,8 +92,10 @@ class DiffusiveCoupling(brainstate.nn.Module):
         delayed_x = self.x()
         y = u.math.expand_dims(self.y(), axis=1)  # (..., 1)
         if self.conn.ndim == 1:
-            assert self.conn.size == delayed_x.shape[-1], (f'Connection matrix size {self.conn.size} does not '
-                                                           f'match the variable size {delayed_x.shape[-1]}.')
+            assert self.conn.size == delayed_x.shape[-1], (
+                f'Connection matrix size {self.conn.size} does not '
+                f'match the variable size {delayed_x.shape[-1]}.'
+            )
             diffusive = (self.conn * delayed_x).reshape(y.shape[0], -1) - y
         elif self.conn.ndim == 2:
             delayed_x = delayed_x.reshape(y.shape[0], -1)
@@ -98,4 +104,4 @@ class DiffusiveCoupling(brainstate.nn.Module):
             diffusive = (self.conn * delayed_x) - y
         else:
             raise NotImplementedError(f'Only support 1d, 2d connection matrix. But we got {self.conn.ndim}d.')
-        return diffusive.sum(axis=1)
+        return self.k * diffusive.sum(axis=1)
