@@ -13,17 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
+import brainmass
 import brainstate
-import brainunit as u
 import matplotlib.pyplot as plt
 import numpy as np
-
-import brainfield
 
 
 class TestNoise:
     def test1(self):
-        noise = brainfield.OUProcess(1)
+        noise = brainmass.OUProcess(1)
         noise.init_state()
 
         def step_run(i):
