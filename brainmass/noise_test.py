@@ -27,10 +27,11 @@ class TestNoise:
         noise.init_state()
 
         def step_run(i):
-            with brainstate.environ.context(dt=0.1 * u.ms):
+            with brainstate.environ.context(dt=0.1):
                 noise()
             return noise.x.value
 
         xs = brainstate.transform.for_loop(step_run, np.arange(100000))
         plt.plot(xs)
         plt.show()
+        plt.close()
