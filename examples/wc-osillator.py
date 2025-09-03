@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-import brainfield
+import brainmass
 import brainstate
 import braintools
 import matplotlib.pyplot as plt
@@ -35,12 +35,12 @@ class Network(brainstate.nn.Module):
         np.fill_diagonal(delay_time, 0)
         indices_ = np.tile(np.arange(conn_weight.shape[1]), conn_weight.shape[0])
 
-        self.node = brainfield.WilsonCowanModel(
+        self.node = brainmass.WilsonCowanModel(
             80,
-            noise_E=brainfield.OUProcess(80, sigma=0.01),
-            noise_I=brainfield.OUProcess(80, sigma=0.01),
+            noise_E=brainmass.OUProcess(80, sigma=0.01),
+            noise_I=brainmass.OUProcess(80, sigma=0.01),
         )
-        self.coupling = brainfield.DiffusiveCoupling(
+        self.coupling = brainmass.DiffusiveCoupling(
             self.node.prefetch_delay('rE', (delay_time.flatten(), indices_), init=brainstate.init.Uniform(0, 0.05)),
             self.node.prefetch('rE'),
             conn_weight,

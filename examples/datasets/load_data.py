@@ -95,7 +95,7 @@ class Dataset:
         being loaded.
 
         The structural connectivity data (accessible using the attribute
-        loadData.Cmat), can be normalized using the `normalizeCmats` flag.
+        loadData.Cmat), can be normalized using the `normalize_Cmat` flag.
         This defaults to "max" which normalizes the Cmat by its maxmimum.
         Other options are `waytotal` or `nvoxel`, which normalizes the
         Cmat by dividing every row of the matrix by the waytotal or
@@ -116,18 +116,18 @@ class Dataset:
 
         """
         # the base directory of the dataset
-        base_dir = os.path.join(os.path.dirname(__file__), datasetName)
-        assert os.path.exists(base_dir), f"Dataset {datasetName} not found in {base_dir}."
+        base_dir = os.path.join(os.path.dirname(__file__), dataset_name)
+        assert os.path.exists(base_dir), f"Dataset {dataset_name} not found in {base_dir}."
         self.base_dir = base_dir
         self.data = brainstate.util.DotDict({})
 
         # load all available subject data from disk to memory
-        print(f"Loading dataset {datasetName} from {self.base_dir}.")
+        print(f"Loading dataset {dataset_name} from {self.base_dir}.")
         self._loadSubjectFiles(self.base_dir, subcortical=subcortical)
         assert len(self.data) > 0, "No data loaded."
         assert self.has_subjects
 
-        self.Cmats = self._normalizeCmats(self.get_data_pe_subject("cm"), method=normalizeCmats)
+        self.Cmats = self._normalize_Cmat(self.get_data_pe_subject("cm"), method=normalize_Cmat)
         self.Dmats = self.get_data_pe_subject("len")
 
         # take the average of all
@@ -137,9 +137,9 @@ class Dataset:
             "len", apply="all", apply_function=np.mean, apply_function_kwargs={"axis": 0}
         )
         self.BOLDs = self.get_data_pe_subject("bold")
-        self.FCs = self.get_data_pe_subject("bold", apply_function=func.fc)
+        # self.FCs = self.get_data_pe_subject("bold", apply_function=func.fc)
 
-        print(f"Dataset {datasetName} loaded.")
+        print(f"Dataset {dataset_name} loaded.")
 
     def get_data_pe_subject(
         self,
@@ -147,7 +147,7 @@ class Dataset:
         apply="single",
         apply_function=None,
         apply_function_kwargs={},
-        normalizeCmats="max",
+        normalize_Cmat="max",
     ):
         """Load data of a certain kind for all users of the current dataset
 
@@ -174,7 +174,7 @@ class Dataset:
             values = apply_function(values, **apply_function_kwargs)
         return values
 
-    def _normalizeCmats(self, Cmats, method="max", FSL_SAMPLES_PER_VOXEL=5000):
+    def _normalize_Cmat(self, Cmats, method="max", FSL_SAMPLES_PER_VOXEL=5000):
         # normalize per subject data
         normalizationMethods = [None, "max", "waytotal", "nvoxel"]
         if method not in normalizationMethods:
@@ -206,7 +206,7 @@ class Dataset:
         :type subcortical: bool, optional
         """
         # check if there are subject files in the dataset
-        if os.path.exists(os.path.join(base_dir, "subjects")):
+        if os.path.exists(os.path.join(base_dir)):
             self.has_subjects = True
             self.data["subjects"] = {}
 
@@ -287,3 +287,34 @@ class Dataset:
             raise ValueError(f"Object is still a dict. Here are the keys: {matrix.keys()}")
         return matrix
         return 0
+
+
+def filterSubcortical(a, axis="both"):
+    """
+    Filter out subcortical areas out of AAL2 atlas
+    Indices from https://github.com/spunt/bspmview/blob/master/supportfiles/AAL2_README.txt
+    Reminder: these are AAL indices, they start at 1!!!
+
+    Hippocampus: 41 - 44
+    Amygdala: 45-46
+    Basal Ganglia: 75-80
+    Thalamus: 81-82
+    Cerebellum: 95-120
+
+    :param a: Input (square) matrix with cortical and subcortical areas
+    :type a: numpy.ndarray
+
+    :return: Matrix without subcortical areas
+    :rtype: numpy.ndarray
+    """
+    # with cerebellum indices
+    # subcortical_index = np.array(list(range(40, 46)) + list(range(74, 82)) + list(range(94, 120)))
+    # without cerebellum
+    subcortical_index = np.array(list(range(40, 46)) + list(range(74, 82)))
+
+    if axis == "both":
+        a = np.delete(a, subcortical_index, axis=0)
+        a = np.delete(a, subcortical_index, axis=1)
+    else:
+        a = np.delete(a, subcortical_index, axis=axis)
+    return a
