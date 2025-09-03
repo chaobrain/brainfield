@@ -9,9 +9,9 @@ exclude = [
     "build*", 
     "dist*", 
     "dev*",
-    "brainfield.egg-info*", 
-    "brainfield/__pycache__*",
-    "brainfield/__init__.py"
+    "brainmass.egg-info*", 
+    "brainmass/__pycache__*",
+    "brainmass/__init__.py"
 ]
 
 
@@ -20,12 +20,12 @@ universal = true
 
 
 [project]
-name = "brainfield"
+name = "brainmass"
 description = ""
 readme = 'README.md'
 license = { text = 'Apache-2.0 license' }
 requires-python = '>=3.10'
-authors = [{ name = 'brainfield Developers', email = 'chao.brain@qq.com' }]
+authors = [{ name = 'brainmass Developers', email = 'chao.brain@qq.com' }]
 classifiers = [
     'Natural Language :: English',
     'Operating System :: OS Independent',
@@ -67,11 +67,11 @@ dependencies = [
 dynamic = ['version']
 
 [tool.flit.module]
-name = "brainfield"
+name = "brainmass"
 
 [project.urls]
-homepage = 'http://github.com/chaobrain/brainfield'
-repository = 'http://github.com/chaobrain/brainfield'
+homepage = 'http://github.com/chaobrain/brainmass'
+repository = 'http://github.com/chaobrain/brainmass'
 
 [project.optional-dependencies]
 testing = [
