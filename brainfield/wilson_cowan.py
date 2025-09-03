@@ -43,8 +43,8 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     F_j(x)=\frac{1}{1+e^{-\gamma_j\left(x-\theta_j\right)}}, \quad j=e, i
     $$
 
-    $r_E(t)$ represents the average activation (or firing rate) of the excitatory
-    population at time $t$, and $r_I(t)$ the activation (or firing rate) of the
+    - $r_E(t)$ represents the average activation (or firing rate) of the excitatory population at time $t$,
+    - $r_I(t)$ the activation (or firing rate) of the
     inhibitory population. The parameters $\\tau_E$ and $\\tau_I$ control the
     timescales of the dynamics of each population. Connection strengths are given
     by: $w_{EE}$ (E $\\rightarrow$ E), $w_{EI}$ (I $\\rightarrow$ E),

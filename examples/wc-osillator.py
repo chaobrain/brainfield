@@ -13,37 +13,37 @@
 # limitations under the License.
 # ==============================================================================
 
+import brainstate
 import braintools
 import matplotlib.pyplot as plt
 import numpy as np
 
-import brainmass
-import brainstate
+import brainfield
 
 brainstate.environ.set(dt=0.1)
 
 
 class Network(brainstate.nn.Module):
-    def __init__(self, signal_speed=20.):
+    def __init__(self, signal_speed=2.):
         super().__init__()
 
-        dt = brainstate.environ.get_dt()
         hcp = np.load('./data/hcp.npz')
-        conn_mat = hcp['Cmat']
-        np.fill_diagonal(conn_mat, 0)
-        delay_mat = np.round(hcp['Dmat'] / signal_speed / dt).astype(np.int32)
-        np.fill_diagonal(delay_mat, 0)
-        indices_ = np.tile(np.arange(conn_mat.shape[1]), conn_mat.shape[0])
+        conn_weight = hcp['Cmat']
+        np.fill_diagonal(conn_weight, 0)
+        delay_time = hcp['Dmat'] / signal_speed
+        np.fill_diagonal(delay_time, 0)
+        indices_ = np.tile(np.arange(conn_weight.shape[1]), conn_weight.shape[0])
 
-        self.node = brainmass.WilsonCowanModel(
+        self.node = brainfield.WilsonCowanModel(
             80,
-            noise_E=brainmass.OUProcess(80, sigma=0.01),
-            noise_I=brainmass.OUProcess(80, sigma=0.01),
+            noise_E=brainfield.OUProcess(80, sigma=0.01),
+            noise_I=brainfield.OUProcess(80, sigma=0.01),
         )
-        self.coupling = brainmass.DiffusiveCoupling(
-            self.node.prefetch_delay('rE', (delay_mat.flatten(), indices_), init=brainstate.init.Uniform(0, 0.05)),
+        self.coupling = brainfield.DiffusiveCoupling(
+            self.node.prefetch_delay('rE', (delay_time.flatten(), indices_), init=brainstate.init.Uniform(0, 0.05)),
             self.node.prefetch('rE'),
-            conn_mat,
+            conn_weight,
+            k=1.0
         )
 
     def update(self):
@@ -56,10 +56,9 @@ class Network(brainstate.nn.Module):
             return self.update()
 
 
-indices = np.arange(0, 6e3, brainstate.environ.get_dt())
-
 net = Network()
 brainstate.nn.init_all_states(net)
+indices = np.arange(0, 6e3 // brainstate.environ.get_dt())
 exes = brainstate.transform.for_loop(net.step_run, indices)
 
 plt.rcParams['image.cmap'] = 'plasma'

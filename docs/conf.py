@@ -31,16 +31,16 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../'))
 
-import brainmass
+import brainfield
 
 # -- Project information -----------------------------------------------------
 
-project = 'brainmass'
-copyright = '2025, brainmass'
+project = 'brainfield'
+copyright = '2025, brainfield'
 author = 'BDP Ecosystem'
 
 # The full version, including alpha/beta/rc tags
-release = brainmass.__version__
+release = brainfield.__version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -99,11 +99,11 @@ myst_enable_extensions = [
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = "sphinx_book_theme"
-html_logo = "_static/brainmass.png"
-html_title = "brainmass"
+html_logo = "_static/brainfield.png"
+html_title = "brainfield"
 html_copy_source = True
 html_sourcelink_suffix = ""
-html_favicon = "_static/brainmass.png"
+html_favicon = "_static/brainfield.png"
 html_last_updated_fmt = ""
 
 # Add any paths that contain custom static files (such as style sheets) here,

@@ -50,7 +50,7 @@ jobs:
           pip install .  --no-cache-dir
       - name: Test with pytest
         run: |
-          pytest brainmass/
+          pytest brainfield/
 
 
   test_macos:
@@ -80,7 +80,7 @@ jobs:
           pip install .  --no-cache-dir
       - name: Test with pytest
         run: |
-          pytest brainmass/
+          pytest brainfield/
 
   test_jax_version:
     runs-on: macos-latest
@@ -115,7 +115,7 @@ jobs:
           python -m pip install . || exit 1
       - name: Test with pytest
         run: |
-          pytest brainmass/
+          pytest brainfield/
 
   test_windows:
     runs-on: windows-latest
@@ -144,4 +144,4 @@ jobs:
           pip install .  --no-cache-dir
       - name: Test with pytest
         run: |
-          pytest brainmass/ brainmass
+          pytest brainfield/
