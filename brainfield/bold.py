@@ -18,7 +18,6 @@ import brainstate
 
 from .integration import ode_rk2_step
 
-
 __all__ = [
     'BOLDSignal',
 ]
@@ -76,6 +75,11 @@ class BOLDSignal(brainstate.nn.Dynamics):
         Resting oxygen extraction fraction (default is 0.34).
     V0 : float, optional
         Resting blood volume fraction (default is 0.02).
+
+    References
+    ----------
+    .. [1] Friston KJ, Harrison L, Penny W (2003) Dynamic causal modelling. Neuroimage 19:1273–1302,
+           doi:10.1016/S1053-8119(03)00202-7
     """
 
     def __init__(
@@ -101,12 +105,19 @@ class BOLDSignal(brainstate.nn.Dynamics):
         self.k2 = 2.
         self.k3 = 2 * self.rho - 0.2
 
+        self.init = brainstate.init.Constant(1.)
+
     def init_state(self, batch_size=None, **kwargs):
-        init = brainstate.init.Constant(1.)
-        self.x = brainstate.HiddenState(brainstate.init.param(init, self.varshape, batch_size))
-        self.f = brainstate.HiddenState(brainstate.init.param(init, self.varshape, batch_size))
-        self.v = brainstate.HiddenState(brainstate.init.param(init, self.varshape, batch_size))
-        self.q = brainstate.HiddenState(brainstate.init.param(init, self.varshape, batch_size))
+        self.x = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))
+        self.f = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))
+        self.v = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))
+        self.q = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))
+
+    def reset_state(self, batch_size=None, **kwargs):
+        self.x.value = brainstate.init.param(self.init, self.varshape, batch_size)
+        self.f.value = brainstate.init.param(self.init, self.varshape, batch_size)
+        self.v.value = brainstate.init.param(self.init, self.varshape, batch_size)
+        self.q.value = brainstate.init.param(self.init, self.varshape, batch_size)
 
     def derivative(self, y, t, z):
         x, f, v, q = y
