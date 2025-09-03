@@ -144,4 +144,4 @@ jobs:
           pip install .  --no-cache-dir
       - name: Test with pytest
         run: |
-          pytest brainfield/ brainfield
+          pytest brainfield/
