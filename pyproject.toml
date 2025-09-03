@@ -46,11 +46,22 @@ classifiers = [
 ]
 
 
-keywords = ['physical unit', 'physical quantity', 'brain modeling']
+keywords = [
+    'neural mass model',
+    'brain modeling',
+    'rate model',
+    'mean field model',
+    'neuroscience',
+    'computational neuroscience',
+    'brain simulation',
+]
 
 dependencies = [
     'jax',
     'numpy',
+    'brainunit',
+    'brainscale',
+    'brainstate>=0.1.8',
 ]
 
 dynamic = ['version']

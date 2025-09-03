@@ -14,9 +14,9 @@
 # ==============================================================================
 
 
-import brainunit as u
-
+import brainscale
 import brainstate
+import brainunit as u
 
 __all__ = [
     'OUProcess',
@@ -65,7 +65,7 @@ class OUProcess(brainstate.nn.Dynamics):
 
     def init_state(self, batch_size=None, **kwargs):
         size = self.in_size if batch_size is None else (batch_size, *self.in_size)
-        self.x = brainstate.HiddenState(u.math.zeros(size, unit=u.get_unit(self.mean)))
+        self.x = brainscale.ETraceState(u.math.zeros(size, unit=u.get_unit(self.mean)))
 
     def reset_state(self, batch_size=None, **kwargs):
         size = self.in_size if batch_size is None else (batch_size, *self.in_size)

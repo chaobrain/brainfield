@@ -14,11 +14,10 @@
 # ==============================================================================
 
 
-from typing import Union, Tuple
-
-import brainunit as u
+from typing import Union
 
 import brainstate
+import brainunit as u
 from brainstate.nn._dynamics import maybe_init_prefetch
 
 Prefetch = Union[brainstate.nn.PrefetchDelayAt, brainstate.nn.PrefetchDelay, brainstate.nn.Prefetch]

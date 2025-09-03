@@ -3,3 +3,4 @@
 # test requirements
 pytest
 absl-py
+matplotlib

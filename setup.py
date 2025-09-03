@@ -54,7 +54,7 @@ setup(
     author_email='chao.brain@qq.com',
     packages=packages,
     python_requires='>=3.10',
-    install_requires=['numpy', 'jax'],
+    install_requires=['numpy', 'jax', 'brainstate>=0.1.8', 'brainunit'],
     url='https://github.com/chaobrain/brainmass',
     project_urls={
         "Bug Tracker": "https://github.com/chaobrain/brainmass/issues",
@@ -66,7 +66,15 @@ setup(
         'cuda12': ['jax[cuda12]'],
         'tpu': ['jax[tpu]'],
     },
-    keywords='neural mass model, brain modeling',
+    keywords=[
+        'neural mass model',
+        'brain modeling',
+        'rate model',
+        'mean field model',
+        'neuroscience',
+        'computational neuroscience',
+        'brain simulation',
+    ],
     classifiers=[
         'Natural Language :: English',
         'Operating System :: OS Independent',
