@@ -14,10 +14,11 @@
 # ==============================================================================
 
 
+import brainscale
 import brainstate
 import jax.numpy as jnp
-from .noise import OUProcess
 
+from .noise import OUProcess
 
 __all__ = [
     'WilsonCowanModel',
@@ -100,8 +101,8 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
 
     def init_state(self, batch_size=None, **kwargs):
         size = self.varshape if batch_size is None else (batch_size,) + self.varshape
-        self.rE = brainstate.HiddenState(brainstate.init.param(jnp.zeros, size))
-        self.rI = brainstate.HiddenState(brainstate.init.param(jnp.zeros, size))
+        self.rE = brainscale.ETraceState(brainstate.init.param(jnp.zeros, size))
+        self.rI = brainscale.ETraceState(brainstate.init.param(jnp.zeros, size))
 
     def reset_state(self, batch_size=None, **kwargs):
         size = self.varshape if batch_size is None else (batch_size,) + self.varshape

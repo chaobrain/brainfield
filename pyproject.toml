@@ -60,6 +60,7 @@ dependencies = [
     'jax',
     'numpy',
     'brainunit',
+    'brainscale',
     'brainstate>=0.1.8',
 ]
 
