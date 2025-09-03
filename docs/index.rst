@@ -1,7 +1,7 @@
-``brainfield`` documentation
+``brainmass`` documentation
 ============================
 
-`brainfield <https://github.com/chaobrain/brainfield>`_ implements neural filed models with `brainstate <https://github.com/chaobrain/brainstate>`_,
+`brainmass <https://github.com/chaobrain/brainmass>`_ implements neural filed models with `brainstate <https://github.com/chaobrain/brainstate>`_,
 a JAX-based framework for large-scale brain dynamics programming.
 
 
@@ -15,33 +15,31 @@ Features
 .. grid::
 
 
-
    .. grid-item::
       :columns: 12 12 12 6
 
-      .. card:: Program Compilation
+      .. card:: Intuitive Programming
          :class-card: sd-border-0
          :shadow: none
          :class-title: sd-fs-6
 
          .. div:: sd-font-normal
 
-            ``BrainFiled`` provides simple interface to build complex neural field models.
+            ``brainmass`` provides simple interface to build complex neural mass models.
 
 
 
    .. grid-item::
       :columns: 12 12 12 6
 
-      .. card:: Program Augmentation
+      .. card:: Differentiable Optimization
          :class-card: sd-border-0
          :shadow: none
          :class-title: sd-fs-6
 
          .. div:: sd-font-normal
 
-            ``BrainFiled`` supports differentiable optimizations to fit model parameters to empirical data.
-
+            ``brainmass`` supports differentiable optimizations to fit model parameters to empirical data.
 
 
 
@@ -57,19 +55,19 @@ Installation
 
        .. code-block:: bash
 
-          pip install -U brainfield[cpu]
+          pip install -U brainmass[cpu]
 
     .. tab-item:: GPU (CUDA 12.0)
 
        .. code-block:: bash
 
-          pip install -U brainfield[cuda12]
+          pip install -U brainmass[cuda12]
 
     .. tab-item:: TPU
 
        .. code-block:: bash
 
-          pip install -U brainfield[tpu]
+          pip install -U brainmass[tpu]
 
 ----
 

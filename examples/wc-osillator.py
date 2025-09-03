@@ -13,13 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
+import brainmass
 import brainstate
 import braintools
 import matplotlib.pyplot as plt
 import numpy as np
+from datasets import Dataset
 
-import brainfield
 
+hcp = Dataset('hcp')
 brainstate.environ.set(dt=0.1)
 
 
@@ -27,19 +29,18 @@ class Network(brainstate.nn.Module):
     def __init__(self, signal_speed=2.):
         super().__init__()
 
-        hcp = np.load('./data/hcp.npz')
-        conn_weight = hcp['Cmat']
+        conn_weight = hcp.Cmat
         np.fill_diagonal(conn_weight, 0)
-        delay_time = hcp['Dmat'] / signal_speed
+        delay_time = hcp.Dmat / signal_speed
         np.fill_diagonal(delay_time, 0)
         indices_ = np.tile(np.arange(conn_weight.shape[1]), conn_weight.shape[0])
 
-        self.node = brainfield.WilsonCowanModel(
+        self.node = brainmass.WilsonCowanModel(
             80,
-            noise_E=brainfield.OUProcess(80, sigma=0.01),
-            noise_I=brainfield.OUProcess(80, sigma=0.01),
+            noise_E=brainmass.OUProcess(80, sigma=0.01),
+            noise_I=brainmass.OUProcess(80, sigma=0.01),
         )
-        self.coupling = brainfield.DiffusiveCoupling(
+        self.coupling = brainmass.DiffusiveCoupling(
             self.node.prefetch_delay('rE', (delay_time.flatten(), indices_), init=brainstate.init.Uniform(0, 0.05)),
             self.node.prefetch('rE'),
             conn_weight,
