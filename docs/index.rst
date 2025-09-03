@@ -1,7 +1,9 @@
 ``brainfield`` documentation
 ============================
 
-`brainfield <https://github.com/chaobrain/brainfield>`_ implements a
+`brainfield <https://github.com/chaobrain/brainfield>`_ implements neural filed models with `brainstate <https://github.com/chaobrain/brainstate>`_,
+a JAX-based framework for large-scale brain dynamics programming.
+
 
 
 
@@ -24,7 +26,7 @@ Features
 
          .. div:: sd-font-normal
 
-            ``BrainState`` supports `program compilation <./apis/compile.html>`__ (such as just-in-time compilation) with its `state-based <./apis/brainstate.html>`__ IR construction.
+            ``BrainFiled`` provides simple interface to build complex neural field models.
 
 
 
@@ -38,7 +40,7 @@ Features
 
          .. div:: sd-font-normal
 
-            ``BrainState`` supports program `functionality augmentation <./apis/augment.html>`__ (such batching) with its `graph-based <./apis/graph.html>`__ Python objects.
+            ``BrainFiled`` supports differentiable optimizations to fit model parameters to empirical data.
 
 
 
@@ -55,28 +57,28 @@ Installation
 
        .. code-block:: bash
 
-          pip install -U brainstate[cpu]
+          pip install -U brainfield[cpu]
 
     .. tab-item:: GPU (CUDA 12.0)
 
        .. code-block:: bash
 
-          pip install -U brainstate[cuda12]
+          pip install -U brainfield[cuda12]
 
     .. tab-item:: TPU
 
        .. code-block:: bash
 
-          pip install -U brainstate[tpu] -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+          pip install -U brainfield[tpu]
 
 ----
 
 
-See also the BDP ecosystem
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+See also the brain modeling ecosystem
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-We are building the `Brain Dynamics Programming ecosystem <https://ecosystem-for-brain-dynamics.readthedocs.io/>`_.
+We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs.io/>`_.
 
 
 .. toctree::
