@@ -1,3 +1,3 @@
-# Neural Mass Model for Brain Modeling
+# Whole-brain modeling with differentiable neural field models
 
 

@@ -20,9 +20,11 @@ __all__ = [
     'DiffusiveCoupling',
     'WilsonCowanModel',
     'OUProcess',
+    'BOLDSignal',
 ]
 
 
 from .difusive_coupling import *
 from .noise import *
 from .wilson_cowan import *
+from .bold import *

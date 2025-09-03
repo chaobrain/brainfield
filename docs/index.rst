@@ -15,11 +15,10 @@ Features
 .. grid::
 
 
-
    .. grid-item::
       :columns: 12 12 12 6
 
-      .. card:: Program Compilation
+      .. card:: Intuitive Programming
          :class-card: sd-border-0
          :shadow: none
          :class-title: sd-fs-6
@@ -33,7 +32,7 @@ Features
    .. grid-item::
       :columns: 12 12 12 6
 
-      .. card:: Program Augmentation
+      .. card:: Differentiable Optimization
          :class-card: sd-border-0
          :shadow: none
          :class-title: sd-fs-6
