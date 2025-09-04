@@ -43,15 +43,14 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     $$
 
     - $r_E(t)$ represents the average activation (or firing rate) of the excitatory population at time $t$,
-    - $r_I(t)$ the activation (or firing rate) of the
-    inhibitory population. The parameters $\\tau_E$ and $\\tau_I$ control the
-    timescales of the dynamics of each population. Connection strengths are given
-    by: $w_{EE}$ (E $\\rightarrow$ E), $w_{EI}$ (I $\\rightarrow$ E),
-    $w_{IE}$ (E $\\rightarrow$ I), and $w_{II}$ (I $\\rightarrow$ I). The terms
-    $w_{EI}$ and $w_{IE}$ represent connections from inhibitory to excitatory
-    population and vice versa, respectively. The transfer functions (or F-I curves)
-    $F_E(x;a_E,\\theta_E)$ and $F_I(x;a_I,\\theta_I)$ can be different for the
-    excitatory and the inhibitory populations.
+    - $r_I(t)$ the activation (or firing rate) of the inhibitory population,
+    - The parameters $\\tau_E$ and $\\tau_I$ control the timescales of the dynamics of each population.
+    - Connection strengths are given by: $w_{EE}$ (E $\\rightarrow$ E), $w_{EI}$ (I $\\rightarrow$ E),
+      $w_{IE}$ (E $\\rightarrow$ I), and $w_{II}$ (I $\\rightarrow$ I).
+    - The terms $w_{EI}$ and $w_{IE}$ represent connections from inhibitory to excitatory
+      population and vice versa, respectively.
+    - The transfer functions (or F-I curves) $F_E(x;a_E,\\theta_E)$ and $F_I(x;a_I,\\theta_I)$
+      can be different for the excitatory and the inhibitory populations.
 
     """
 

@@ -132,7 +132,6 @@ class Dataset:
 
         # take the average of all
         self.Cmat = np.mean(self.Cmats, axis=0)
-
         self.Dmat = self.get_data_pe_subject(
             "len", apply="all", apply_function=np.mean, apply_function_kwargs={"axis": 0}
         )
@@ -286,7 +285,6 @@ class Dataset:
         elif type(matrix) is dict:
             raise ValueError(f"Object is still a dict. Here are the keys: {matrix.keys()}")
         return matrix
-        return 0
 
 
 def filterSubcortical(a, axis="both"):

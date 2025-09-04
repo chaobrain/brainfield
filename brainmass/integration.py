@@ -13,35 +13,39 @@
 # limitations under the License.
 # ==============================================================================
 
+from typing import Callable
 
 import brainstate
 import jax
 import jax.numpy as jnp
+from brainstate.typing import PyTree
 
 __all__ = [
     'ode_euler_step',
     'ode_rk2_step',
     'ode_rk3_step',
     'ode_rk4_step',
-    'sde_euler',
-    'sde_milstein',
+    'sde_euler_step',
+    'sde_milstein_step',
 ]
 
+ODE = Callable[[PyTree, float, ...], PyTree]
 
-def ode_euler_step(f, y, t, *args):
+
+def ode_euler_step(f: ODE, y: PyTree, t, *args):
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     return jax.tree.map(lambda x, _k1,: x + dt * _k1, y, k1)
 
 
-def ode_rk2_step(f, y, t, *args):
+def ode_rk2_step(f: ODE, y: PyTree, t, *args):
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt * k, y, k1), t + dt, *args)
     return jax.tree.map(lambda x, _k1, _k2: x + dt / 2 * (_k1 + _k2), y, k1, k2)
 
 
-def ode_rk3_step(f, y, t, *args):
+def ode_rk3_step(f: ODE, y: PyTree, t, *args):
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt / 2 * k, y, k1), t + dt / 2, *args)
@@ -50,7 +54,7 @@ def ode_rk3_step(f, y, t, *args):
     return jax.tree.map(lambda x, _k1, _k2, _k3, _k4: x + dt / 6 * (_k1 + 4 * _k2 + _k3), y, k1, k2, k3, k4)
 
 
-def ode_rk4_step(f, y, t, *args):
+def ode_rk4_step(f: ODE, y: PyTree, t, *args):
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt / 2 * k, y, k1), t + dt / 2, *args)
