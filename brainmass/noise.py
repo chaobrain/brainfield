@@ -41,25 +41,26 @@ class OUProcess(brainstate.nn.Dynamics):
     in_size: int, sequence of int
       The model size.
     mean: ArrayLike
-      The noise mean value.
+      The noise mean value.  Default is 0 nA.
     sigma: ArrayLike
-      The noise amplitude.
+      The noise amplitude. Defualt is 1 nA.
     tau: ArrayLike
-      The decay time constant.
+      The decay time constant. The larger the value, the slower the decay. Default is 10 ms.
     """
 
     def __init__(
         self,
         in_size: brainstate.typing.Size,
-        mean: brainstate.typing.ArrayLike = 0.,  # noise mean value
-        sigma: brainstate.typing.ArrayLike = 1.,  # noise amplitude
-        tau: brainstate.typing.ArrayLike = 10.,  # time constant
+        mean: brainstate.typing.ArrayLike = None,  # noise mean value
+        sigma: brainstate.typing.ArrayLike = 1. * u.nA,  # noise amplitude
+        tau: brainstate.typing.ArrayLike = 10. * u.ms,  # time constant
     ):
         super().__init__(in_size=in_size)
 
         # parameters
-        self.mean = mean
         self.sigma = sigma
+        mean = 0. * u.get_unit(sigma) if mean is None else mean
+        self.mean = mean
         self.tau = tau
 
     def init_state(self, batch_size=None, **kwargs):

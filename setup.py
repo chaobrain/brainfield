@@ -38,6 +38,7 @@ packages = find_packages(
         "build*",
         "dev*",
         "dist*",
+        "examples*",
         "brainmass.egg-info*",
         "brainmass/__pycache__*"
     ]

@@ -9,7 +9,8 @@ exclude = [
     "build*", 
     "dist*", 
     "dev*",
-    "brainmass.egg-info*", 
+    "examples*",
+    "brainmass.egg-info*",
     "brainmass/__pycache__*",
     "brainmass/__init__.py"
 ]
