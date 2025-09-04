@@ -31,8 +31,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../'))
 
-import brainmass
-
 # -- Project information -----------------------------------------------------
 
 project = 'brainmass'
@@ -40,7 +38,11 @@ copyright = '2025, brainmass'
 author = 'BDP Ecosystem'
 
 # The full version, including alpha/beta/rc tags
+import brainmass
 release = brainmass.__version__
+
+import shutil
+shutil.copytree('../examples', './examples', dirs_exist_ok=True)
 
 # -- General configuration ---------------------------------------------------
 

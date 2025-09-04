@@ -15,16 +15,15 @@
 
 __version__ = "0.0.1"
 
-
 __all__ = [
     'DiffusiveCoupling',
+    'AdditiveCoupling',
     'WilsonCowanModel',
     'OUProcess',
     'BOLDSignal',
 ]
 
-
-from .difusive_coupling import *
+from .bold import *
+from .coupling import *
 from .noise import *
 from .wilson_cowan import *
-from .bold import *
