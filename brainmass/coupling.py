@@ -24,6 +24,7 @@ Prefetch = Union[brainstate.nn.PrefetchDelayAt, brainstate.nn.PrefetchDelay, bra
 
 __all__ = [
     'DiffusiveCoupling',
+    'AdditiveCoupling',
 ]
 
 
@@ -104,4 +105,67 @@ class DiffusiveCoupling(brainstate.nn.Module):
             diffusive = (self.conn * delayed_x) - y
         else:
             raise NotImplementedError(f'Only support 1d, 2d connection matrix. But we got {self.conn.ndim}d.')
+        return self.k * diffusive.sum(axis=1)
+
+
+class AdditiveCoupling(brainstate.nn.Module):
+    r"""
+    Additive coupling.
+
+    This class implements an additive coupling mechanism for neural network modules.
+    It simulates the following model:
+
+    $$
+    \mathrm{current}_i = k * \sum_j g_{ij} * x_{D_{ij}}
+    $$
+
+    where:
+        - $\mathrm{current}_i$: the output current for neuron $i$
+        - $g_{ij}$: the connection strength between neuron $i$ and neuron $j$
+        - $x_{D_{ij}}$: the delayed state variable for neuron $j$, as seen by neuron $i$
+
+    Parameters
+    ----------
+    x : Prefetch
+        The delayed state variable for the source units.
+    conn : brainstate.typing.Array
+        The connection matrix (1D or 2D array) specifying the coupling strengths between units.
+    k: float
+        The global coupling strength. Default is 1.0.
+
+    Attributes
+    ----------
+    x : Prefetch
+        The delayed state variable for the source units.
+    conn : Array
+        The connection matrix.
+    """
+
+    def __init__(
+        self,
+        x: Prefetch,
+        conn: brainstate.typing.Array,
+        k: float = 1.0
+    ):
+        super().__init__()
+        assert isinstance(x, Prefetch), f'The first element must be a Prefetch. But got {type(x)}.'
+        self.x = x
+        self.k = k
+
+        # Connection matrix
+        self.conn = u.math.asarray(conn)
+        assert self.conn.ndim == 2, f'Only support 2d connection matrix. But we got {self.conn.ndim}d.'
+
+    @brainstate.nn.call_order(2)
+    def init_state(self, *args, **kwargs):
+        maybe_init_prefetch(self.x)
+
+    def update(self):
+        delayed_x = self.x()
+        assert self.conn.size == delayed_x.size, (
+            f'Connection matrix size {self.conn.size} does not '
+            f'match the variable size {delayed_x.size}.'
+        )
+        delayed_x = delayed_x.reshape(self.conn.shape)
+        diffusive = self.conn * delayed_x
         return self.k * diffusive.sum(axis=1)
