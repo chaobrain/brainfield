@@ -79,60 +79,14 @@ See also the brain modeling ecosystem
 We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs.io/>`_.
 
 
-.. toctree::
-   :hidden:
-   :maxdepth: 1
-   :caption: Quickstart
-
-   quickstart/concepts-en.ipynb
-   quickstart/concepts-zh.ipynb
-
-
-
-
-.. toctree::
-   :hidden:
-   :maxdepth: 2
-   :caption: Tutorials
-
-
-   tutorials/state-en.ipynb
-   tutorials/state-zh.ipynb
-   tutorials/pygraph-en.ipynb
-   tutorials/pygraph-zh.ipynb
-   tutorials/program_compilation-en.ipynb
-   tutorials/program_compilation-zh.ipynb
-   tutorials/program_augmentation-en.ipynb
-   tutorials/program_augmentation-zh.ipynb
-   tutorials/optimizers-en.ipynb
-   tutorials/optimizers-zh.ipynb
-   tutorials/gspmd-en.ipynb
-   tutorials/gspmd-zh.ipynb
-   tutorials/random_numbers-en.ipynb
-   tutorials/random_numbers-zh.ipynb
-   tutorials/checkpointing-en.ipynb
-   tutorials/checkpointing-zh.ipynb
-   tutorials/artificial_neural_networks-en.ipynb
-   tutorials/artificial_neural_networks-zh.ipynb
-   tutorials/spiking_neural_networks-en.ipynb
-   tutorials/spiking_neural_networks-zh.ipynb
-
-
-
 
 .. toctree::
    :hidden:
    :maxdepth: 2
    :caption: Examples
 
-   examples/core_examples.rst
-   examples/ann_training-en.ipynb
-   examples/ann_training-zh.ipynb
-   examples/snn_simulation-en.ipynb
-   examples/snn_simulation-zh.ipynb
-   examples/snn_training-en.ipynb
-   examples/snn_training-zh.ipynb
-
+   examples/parameter-exploration.ipynb
+   examples/wilsonwowan-osillator.ipynb
 
 
 .. toctree::
@@ -140,6 +94,6 @@ We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs
    :maxdepth: 2
    :caption: API Reference
 
-   changelog.md
+   ../changelog.md
    api.rst
 

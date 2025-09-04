@@ -33,12 +33,57 @@ ODE = Callable[[PyTree, float, ...], PyTree]
 
 
 def ode_euler_step(f: ODE, y: PyTree, t, *args):
+    """
+    Euler method for solving ordinary differential equations.
+    
+    The Euler method is the simplest numerical method for solving ODEs of the form:
+    dy/dt = f(y, t)
+    
+    The method approximates the solution using:
+    y_{n+1} = y_n + dt * f(y_n, t_n)
+    
+    Args:
+        f (ODE): The differential equation function dy/dt = f(y, t, *args)
+        y (PyTree): Current state vector
+        t (float): Current time
+        *args: Additional arguments passed to function f
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This is a first-order method with O(dt) local truncation error.
+        It's the least accurate but most computationally efficient method.
+    """
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
-    return jax.tree.map(lambda x, _k1,: x + dt * _k1, y, k1)
+    return jax.tree.map(lambda x, _k1: x + dt * _k1, y, k1)
 
 
 def ode_rk2_step(f: ODE, y: PyTree, t, *args):
+    """
+    Second-order Runge-Kutta method (RK2) for solving ODEs.
+    
+    Also known as the midpoint method or Heun's method, this method provides
+    better accuracy than Euler by using two function evaluations:
+    
+    k1 = f(y_n, t_n)
+    k2 = f(y_n + dt*k1, t_n + dt)
+    y_{n+1} = y_n + dt/2 * (k1 + k2)
+    
+    Args:
+        f (ODE): The differential equation function dy/dt = f(y, t, *args)
+        y (PyTree): Current state vector
+        t (float): Current time
+        *args: Additional arguments passed to function f
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This is a second-order method with O(dt²) local truncation error.
+        More accurate than Euler with only one additional function evaluation.
+    """
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt * k, y, k1), t + dt, *args)
@@ -46,15 +91,61 @@ def ode_rk2_step(f: ODE, y: PyTree, t, *args):
 
 
 def ode_rk3_step(f: ODE, y: PyTree, t, *args):
+    """
+    Third-order Runge-Kutta method (RK3) for solving ODEs.
+    
+    This method uses three function evaluations to achieve third-order accuracy:
+    
+    k1 = f(y_n, t_n)
+    k2 = f(y_n + dt/2*k1, t_n + dt/2)
+    k3 = f(y_n - dt*k1 + 2*dt*k2, t_n + dt)
+    y_{n+1} = y_n + dt/6 * (k1 + 4*k2 + k3)
+    
+    Args:
+        f (ODE): The differential equation function dy/dt = f(y, t, *args)
+        y (PyTree): Current state vector
+        t (float): Current time
+        *args: Additional arguments passed to function f
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This is a third-order method with O(dt³) local truncation error.
+        More accurate than RK2 but requires one additional function evaluation.
+    """
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt / 2 * k, y, k1), t + dt / 2, *args)
-    k3 = f(jax.tree.map(lambda x, k: x + dt / 2 * k, y, k2), t + dt / 2, *args)
-    k4 = f(jax.tree.map(lambda x, k: x + dt * k, y, k3), t + dt, *args)
-    return jax.tree.map(lambda x, _k1, _k2, _k3, _k4: x + dt / 6 * (_k1 + 4 * _k2 + _k3), y, k1, k2, k3, k4)
+    k3 = f(jax.tree.map(lambda x, k1_val, k2_val: x - dt * k1_val + 2 * dt * k2_val, y, k1, k2), t + dt, *args)
+    return jax.tree.map(lambda x, _k1, _k2, _k3: x + dt / 6 * (_k1 + 4 * _k2 + _k3), y, k1, k2, k3)
 
 
 def ode_rk4_step(f: ODE, y: PyTree, t, *args):
+    """
+    Fourth-order Runge-Kutta method (RK4) for solving ODEs.
+    
+    The classic RK4 method uses four function evaluations to achieve fourth-order accuracy:
+    
+    k1 = f(y_n, t_n)
+    k2 = f(y_n + dt/2*k1, t_n + dt/2)
+    k3 = f(y_n + dt/2*k2, t_n + dt/2)
+    k4 = f(y_n + dt*k3, t_n + dt)
+    y_{n+1} = y_n + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+    
+    Args:
+        f (ODE): The differential equation function dy/dt = f(y, t, *args)
+        y (PyTree): Current state vector
+        t (float): Current time
+        *args: Additional arguments passed to function f
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This is a fourth-order method with O(dt⁴) local truncation error.
+        The most commonly used method due to excellent accuracy/cost trade-off.
+    """
     dt = brainstate.environ.get_dt()
     k1 = f(y, t, *args)
     k2 = f(jax.tree.map(lambda x, k: x + dt / 2 * k, y, k1), t + dt / 2, *args)
@@ -67,6 +158,34 @@ def ode_rk4_step(f: ODE, y: PyTree, t, *args):
 
 
 def sde_euler_step(df, dg, y, t, sde_type='ito', **kwargs):
+    """
+    Euler-Maruyama method for solving stochastic differential equations (SDEs).
+    
+    Solves SDEs of the form:
+    dy = f(y, t)dt + g(y, t)dW
+    
+    where f is the drift term, g is the diffusion term, and dW is Wiener noise.
+    
+    The Euler-Maruyama scheme approximates:
+    y_{n+1} = y_n + f(y_n, t_n)*dt + g(y_n, t_n)*ΔW_n
+    
+    where ΔW_n ~ N(0, dt) is the Wiener increment.
+    
+    Args:
+        df (Callable): Drift function f(y, t, **kwargs) -> PyTree
+        dg (Callable): Diffusion function g(y, t, **kwargs) -> PyTree  
+        y (PyTree): Current state vector
+        t (float): Current time
+        sde_type (str): Type of SDE interpretation ('ito' only supported)
+        **kwargs: Additional arguments passed to df and dg
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This method has strong convergence order 0.5 and weak convergence order 1.0.
+        Only Itô interpretation is currently supported.
+    """
     assert sde_type in ['ito', ]
 
     dt = brainstate.environ.get_dt()
@@ -79,6 +198,35 @@ def sde_euler_step(df, dg, y, t, sde_type='ito', **kwargs):
 
 
 def sde_milstein_step(df, dg, y, t, sde_type='ito', **kwargs):
+    """
+    Milstein method for solving stochastic differential equations (SDEs).
+    
+    Solves SDEs of the form:
+    dy = f(y, t)dt + g(y, t)dW
+    
+    The Milstein scheme includes an additional correction term for higher accuracy:
+    y_{n+1} = y_n + f(y_n, t_n)*dt + g(y_n, t_n)*ΔW_n + 
+              (1/2)*g(y_n, t_n)*∂g/∂y(y_n, t_n)*((ΔW_n)² - dt)
+    
+    This method approximates the derivative ∂g/∂y using finite differences:
+    ∂g/∂y ≈ (g(y + g*√dt) - g(y)) / √dt
+    
+    Args:
+        df (Callable): Drift function f(y, t, **kwargs) -> PyTree
+        dg (Callable): Diffusion function g(y, t, **kwargs) -> PyTree
+        y (PyTree): Current state vector
+        t (float): Current time
+        sde_type (str): SDE interpretation ('ito' or 'stra' for Stratonovich)
+        **kwargs: Additional arguments passed to df and dg
+        
+    Returns:
+        PyTree: Updated state vector y_{n+1}
+        
+    Note:
+        This method has strong convergence order 1.0, better than Euler-Maruyama.
+        Supports both Itô and Stratonovich interpretations.
+        The finite difference approximation is used for the derivative term.
+    """
     assert sde_type in ['ito', 'stra']
 
     dt = brainstate.environ.get_dt()
