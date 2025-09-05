@@ -14,6 +14,8 @@
 # ==============================================================================
 
 
+from typing import NamedTuple
+
 import brainstate
 import brainunit as u
 import jax.numpy as jnp
@@ -278,3 +280,54 @@ class WongWangModel(brainstate.nn.Dynamics):
         r1 = self.phi(I1)
         r2 = self.phi(I2)
         return jnp.where((r1 > threshold) & (r1 > r2), 1, jnp.where((r2 > threshold) & (r2 > r1), -1, 0))
+
+
+
+
+
+class ReducedWongWangParam(NamedTuple):
+    std_in = (0.02, 0)  # standard deviation of the Gaussian noise
+    std_out = (0.02, 0)  # standard deviation of the Gaussian noise
+    # Parameters for the ODEs
+    # Excitatory population
+    W_E = (1., 0)  # scale of the external input
+    tau_E = (100., 0)  # decay time
+    gamma_E = (0.641 / 1000., 0)  # other dynamic parameter (?)
+
+    # Inhibitory population
+    W_I = (0.7, 0)  # scale of the external input
+    tau_I = (10., 0)  # decay time
+    gamma_I = (1. / 1000., 0)  # other dynamic parameter (?)
+
+    # External input
+    I_0 = (0.32, 0)  # external input
+    I_external = (0., 0)  # external stimulation
+
+    # Coupling parameters
+    g = (20., 0)  # global coupling (from all nodes E_j to single node E_i)
+    g_EE = (.1, 0)  # local self excitatory feedback (from E_i to E_i)
+    g_IE = (.1, 0)  # local inhibitory coupling (from I_i to E_i)
+    g_EI = (0.1, 0)  # local excitatory coupling (from E_i to I_i)
+
+    aE = (310, 0)
+    bE = (125, 0)
+    dE = (0.16, 0)
+    aI = (615, 0)
+    bI = (177, 0)
+    dI = (0.087, 0)
+
+    # Output (BOLD signal)
+    alpha = (0.32, 0)
+    rho = (0.34, 0)
+    k1 = (2.38, 0)
+    k2 = (2.0, 0)
+    k3 = (0.48, 0)  # adjust this number from 0.48 for BOLD fluctruate around zero
+    V = (.02, 0)
+    E0 = (0.34, 0)
+    tau_s = (1 / 0.65, 0)
+    tau_f = (1 / 0.41, 0)
+    tau_0 = (0.98, 0)
+    mu = (0.5, 0)
+
+
+

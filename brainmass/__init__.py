@@ -13,19 +13,21 @@
 # limitations under the License.
 # ==============================================================================
 
-__version__ = "0.0.1"
+__version__ = "0.0.3"
 
 __all__ = [
     'DiffusiveCoupling',
     'AdditiveCoupling',
     'WilsonCowanModel',
     'WongWangModel',
+    'JansenRitModel',
     'OUProcess',
     'BOLDSignal',
 ]
 
 from .bold import *
 from .coupling import *
+from .jansen_rit import *
 from .noise import *
 from .wilson_cowan import *
 from .wong_wang import *
