@@ -21,9 +21,11 @@ __all__ = [
     'WilsonCowanModel',
     'OUProcess',
     'BOLDSignal',
+    'HopfModel',
 ]
 
 from .bold import *
 from .coupling import *
 from .noise import *
 from .wilson_cowan import *
+from .hopf import *
