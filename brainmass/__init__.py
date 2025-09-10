@@ -22,6 +22,7 @@ __all__ = [
     'OUProcess',
     'BOLDSignal',
     'HopfModel',
+    'HopfCoupling', 
 ]
 
 from .bold import *
@@ -29,3 +30,4 @@ from .coupling import *
 from .noise import *
 from .wilson_cowan import *
 from .hopf import *
+from .hopf_coupling import *
