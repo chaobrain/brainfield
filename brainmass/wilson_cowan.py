@@ -49,8 +49,8 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     .. math::
         F_j(x) = \frac{1}{1 + e^{-a_j(x - \theta_j)}} - \frac{1}{1 + e^{a_j \theta_j}}, \quad j \in \{E, I\}
 
-    Parameters:
-    ===========
+    Parameters
+    ==========
     - **tau_E, tau_I** (ms): Time constants controlling the response speed of excitatory 
       and inhibitory populations
     - **a_E, a_I** (dimensionless): Gain parameters controlling the steepness of the 
@@ -62,13 +62,13 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     - **wII** (dimensionless): Inhibitory-to-inhibitory connection strength
     - **r** (dimensionless): Refractory parameter affecting maximum activation levels
 
-    State Variables:
-    ===============
+    State Variables
+    ==============
     - **rE**: Excitatory population activation (dimensionless, normalized firing rate)
     - **rI**: Inhibitory population activation (dimensionless, normalized firing rate)
 
-    References:
-    ===========
+    References
+    ==========
     Wilson, H.R. & Cowan, J.D. "Excitatory and inhibitory interactions in localized 
     populations of model neurons." Biophysical Journal 12, 1–24 (1972).
 
