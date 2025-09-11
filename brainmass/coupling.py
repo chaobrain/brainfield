@@ -16,8 +16,9 @@
 
 from typing import Union
 
-import brainstate
 import brainunit as u
+
+import brainstate
 from brainstate.nn._dynamics import maybe_init_prefetch
 
 Prefetch = Union[brainstate.nn.PrefetchDelayAt, brainstate.nn.PrefetchDelay, brainstate.nn.Prefetch]
@@ -36,7 +37,7 @@ class DiffusiveCoupling(brainstate.nn.Module):
     It simulates the following model:
 
     $$
-    \mathrm{current}_i = k * \sum_j (g_{ij} * x_{D_{ij}} - y_i)
+    \mathrm{current}_i = k * \sum_j g_{ij} * (x_{D_{ij}} - y_i)
     $$
 
     where:
@@ -90,21 +91,21 @@ class DiffusiveCoupling(brainstate.nn.Module):
         maybe_init_prefetch(self.y)
 
     def update(self):
-        delayed_x = self.x()
         y = u.math.expand_dims(self.y(), axis=1)  # (..., 1)
+        delayed_x = self.x().reshape(y.shape[0], -1)
         if self.conn.ndim == 1:
-            assert self.conn.size == delayed_x.shape[-1], (
+            assert self.conn.size == delayed_x.size, (
                 f'Connection matrix size {self.conn.size} does not '
-                f'match the variable size {delayed_x.shape[-1]}.'
+                f'match the variable size {delayed_x.size}.'
             )
-            diffusive = (self.conn * delayed_x).reshape(y.shape[0], -1) - y
+            conn = self.conn.reshape(y.shape[0], -1)
         elif self.conn.ndim == 2:
-            delayed_x = delayed_x.reshape(y.shape[0], -1)
             assert self.conn.shape == delayed_x.shape, (f'Connection matrix shape {self.conn.shape} does not '
                                                         f'match the variable shape {delayed_x.shape}.')
-            diffusive = (self.conn * delayed_x) - y
+            conn = self.conn
         else:
             raise NotImplementedError(f'Only support 1d, 2d connection matrix. But we got {self.conn.ndim}d.')
+        diffusive = conn * (delayed_x - y)
         return self.k * diffusive.sum(axis=1)
 
 

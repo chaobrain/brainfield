@@ -1,4 +1,4 @@
-# Copyright 2024 BDP Ecosystem Limited. All Rights Reserved.
+# Copyright 2025 BDP Ecosystem Limited. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,23 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-__version__ = "0.0.3"
 
-__all__ = [
-    'DiffusiveCoupling',
-    'AdditiveCoupling',
-    'WilsonCowanModel',
-    'WongWangModel',
-    'JansenRitModel',
-    'OUProcess',
-    'BOLDSignal',
-    'Parameter',
-]
+from brainmass.net.jansen_rit import JansenRitNetwork
 
-from .bold import *
-from .coupling import *
-from .jansen_rit import *
-from .noise import *
-from .wilson_cowan import *
-from .wong_wang import *
-from .param import *
+
+class TestJansenRitNetwork:
+    def test_jansen_rit(self):
+        pass
+
+

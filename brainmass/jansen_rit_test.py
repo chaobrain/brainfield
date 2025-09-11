@@ -83,36 +83,36 @@ class TestJansenRitModel:
 
         # Test single instance initialization
         model.init_state()
-        assert model.y0.value.shape == (5,)
-        assert model.y1.value.shape == (5,)
-        assert model.y2.value.shape == (5,)
-        assert model.y3.value.shape == (5,)
-        assert model.y4.value.shape == (5,)
-        assert model.y5.value.shape == (5,)
+        assert model.M.value.shape == (5,)
+        assert model.Mv.value.shape == (5,)
+        assert model.E.value.shape == (5,)
+        assert model.Ev.value.shape == (5,)
+        assert model.I.value.shape == (5,)
+        assert model.Iv.value.shape == (5,)
 
         # Check all states start at zero
-        assert u.math.allclose(model.y0.value / u.mV, 0.)
-        assert u.math.allclose(model.y1.value / (u.mV / u.second), 0.)
-        assert u.math.allclose(model.y2.value / u.mV, 0.)
-        assert u.math.allclose(model.y3.value / (u.mV / u.second), 0.)
-        assert u.math.allclose(model.y4.value / u.mV, 0.)
-        assert u.math.allclose(model.y5.value / (u.mV / u.second), 0.)
+        assert u.math.allclose(model.M.value / u.mV, 0.)
+        assert u.math.allclose(model.Mv.value / (u.mV / u.second), 0.)
+        assert u.math.allclose(model.E.value / u.mV, 0.)
+        assert u.math.allclose(model.Ev.value / (u.mV / u.second), 0.)
+        assert u.math.allclose(model.I.value / u.mV, 0.)
+        assert u.math.allclose(model.Iv.value / (u.mV / u.second), 0.)
 
         # Test batch initialization
         model.init_state(batch_size=3)
-        assert model.y0.value.shape == (3, 5)
-        assert model.y1.value.shape == (3, 5)
-        assert model.y2.value.shape == (3, 5)
-        assert model.y3.value.shape == (3, 5)
-        assert model.y4.value.shape == (3, 5)
-        assert model.y5.value.shape == (3, 5)
+        assert model.M.value.shape == (3, 5)
+        assert model.Mv.value.shape == (3, 5)
+        assert model.E.value.shape == (3, 5)
+        assert model.Ev.value.shape == (3, 5)
+        assert model.I.value.shape == (3, 5)
+        assert model.Iv.value.shape == (3, 5)
 
         # Test reset
-        model.y0.value = jnp.ones((3, 5)) * 0.5 * u.mV
-        model.y1.value = jnp.ones((3, 5)) * 0.1 * u.mV / u.second
+        model.M.value = jnp.ones((3, 5)) * 0.5 * u.mV
+        model.Mv.value = jnp.ones((3, 5)) * 0.1 * u.mV / u.second
         model.reset_state(batch_size=3)
-        assert u.math.allclose(model.y0.value / u.mV, 0.)
-        assert u.math.allclose(model.y1.value / (u.mV / u.second), 0.)
+        assert u.math.allclose(model.M.value / u.mV, 0.)
+        assert u.math.allclose(model.Mv.value / (u.mV / u.second), 0.)
 
         print("[PASS] State initialization test passed")
 
@@ -158,15 +158,15 @@ class TestJansenRitModel:
         Ii = 0.5 * u.mV
 
         # Test dy1 function
-        dy1_val = model.dy1(y1, y0, y2, y4, Ip)
+        dy1_val = model.dmv(y1, y0, y2, y4, Ip)
         assert hasattr(dy1_val, 'mantissa')  # Should be a Quantity with units
 
         # Test dy3 function
-        dy3_val = model.dy3(y3, y0, y2)
+        dy3_val = model.dev(y3, y0, y2)
         assert hasattr(dy3_val, 'mantissa')  # Should be a Quantity with units
 
         # Test dy5 function
-        dy5_val = model.dy5(y5, y0, y4, Ii)
+        dy5_val = model.div(y5, y0, y4, Ii)
         assert hasattr(dy5_val, 'mantissa')  # Should be a Quantity with units
 
         print("[PASS] Derivative functions test passed")
@@ -179,8 +179,8 @@ class TestJansenRitModel:
         model.init_state()
 
         # Initial state should be zero
-        assert u.math.allclose(model.y0.value / u.mV, 0.)
-        assert u.math.allclose(model.y1.value / (u.mV / u.second), 0.)
+        assert u.math.allclose(model.M.value / u.mV, 0.)
+        assert u.math.allclose(model.Mv.value / (u.mV / u.second), 0.)
 
         # Update with external inputs
         Ip = 2. * u.mV
@@ -189,7 +189,7 @@ class TestJansenRitModel:
 
         # After one step, states should have evolved
         # The output should be the EEG proxy signal
-        expected_output = model.a2 * model.y2.value - model.a4 * model.y4.value
+        expected_output = model.a2 * model.E.value - model.a4 * model.I.value
         assert u.math.allclose(output, expected_output)
 
         print("[PASS] Single step update test passed")
@@ -200,12 +200,12 @@ class TestJansenRitModel:
         model.init_state()
 
         # Set specific state values
-        model.y2.value = jnp.array([10.]) * u.mV  # Excitatory PSP
-        model.y4.value = jnp.array([5.]) * u.mV  # Inhibitory PSP
+        model.E.value = jnp.array([10.]) * u.mV  # Excitatory PSP
+        model.I.value = jnp.array([5.]) * u.mV  # Inhibitory PSP
 
         output = model.update()
 
-        # Output should be a2*y2 - a4*y4
+        # Output should be a2*E - a4*I
         expected = model.a2 * 10. * u.mV - model.a4 * 5. * u.mV
         assert u.math.allclose(output, expected)
 
@@ -234,9 +234,9 @@ class TestJansenRitModel:
         # assert u.math.std(outputs) > 0.1 * u.mV
 
         # Check that states remain within reasonable bounds
-        assert jnp.all(jnp.abs(model.y0.value / u.mV) < 50.)
-        assert jnp.all(jnp.abs(model.y2.value / u.mV) < 50.)
-        assert jnp.all(jnp.abs(model.y4.value / u.mV) < 50.)
+        assert jnp.all(jnp.abs(model.M.value / u.mV) < 50.)
+        assert jnp.all(jnp.abs(model.E.value / u.mV) < 50.)
+        assert jnp.all(jnp.abs(model.I.value / u.mV) < 50.)
 
         print("[PASS] Oscillatory dynamics test passed")
 
@@ -310,8 +310,8 @@ class TestJansenRitModel:
         assert output.shape == (batch_size, 2)
 
         # Check that all batch elements have valid states
-        states_units = [(model.y0.value, u.mV), (model.y1.value, u.mV / u.second), (model.y2.value, u.mV),
-                        (model.y3.value, u.mV / u.second), (model.y4.value, u.mV), (model.y5.value, u.mV / u.second)]
+        states_units = [(model.M.value, u.mV), (model.Mv.value, u.mV / u.second), (model.E.value, u.mV),
+                        (model.Ev.value, u.mV / u.second), (model.I.value, u.mV), (model.Iv.value, u.mV / u.second)]
         for state, unit in states_units:
             assert state.shape == (batch_size, 2)
             assert jnp.all(jnp.isfinite((state / unit)))
@@ -338,13 +338,13 @@ class TestJansenRitModel:
 
         # Check for numerical stability
         assert jnp.all(jnp.isfinite(outputs / u.mV))
-        assert jnp.all(jnp.isfinite(model.y0.value / u.mV))
-        assert jnp.all(jnp.isfinite(model.y1.value / (u.mV / u.second)))
+        assert jnp.all(jnp.isfinite(model.M.value / u.mV))
+        assert jnp.all(jnp.isfinite(model.Mv.value / (u.mV / u.second)))
 
         # States should not blow up
-        assert jnp.all(jnp.abs(model.y0.value / u.mV) < 100.)
-        assert jnp.all(jnp.abs(model.y2.value / u.mV) < 100.)
-        assert jnp.all(jnp.abs(model.y4.value / u.mV) < 100.)
+        assert jnp.all(jnp.abs(model.M.value / u.mV) < 100.)
+        assert jnp.all(jnp.abs(model.E.value / u.mV) < 100.)
+        assert jnp.all(jnp.abs(model.I.value / u.mV) < 100.)
 
         print("[PASS] Stability test passed")
 

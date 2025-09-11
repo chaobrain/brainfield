@@ -130,49 +130,49 @@ class JansenRitModel(brainstate.nn.Dynamics):
     def init_state(self, batch_size=None, **kwargs):
         dtype = brainstate.environ.dftype()
         size = self.varshape if batch_size is None else (batch_size, *self.varshape)
-        self.y0 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.y1 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
-        self.y2 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.y3 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
-        self.y4 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.y5 = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
+        self.M = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
+        self.Mv = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
+        self.E = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
+        self.Ev = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
+        self.I = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
+        self.Iv = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
 
     def reset_state(self, batch_size=None, **kwargs):
         dtype = brainstate.environ.dftype()
         size = self.varshape if batch_size is None else (batch_size, *self.varshape)
-        self.y0.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.y1.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
-        self.y2.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.y3.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
-        self.y4.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.y5.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
+        self.M.value = jnp.zeros(size, dtype=dtype) * u.mV
+        self.Mv.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
+        self.E.value = jnp.zeros(size, dtype=dtype) * u.mV
+        self.Ev.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
+        self.I.value = jnp.zeros(size, dtype=dtype) * u.mV
+        self.Iv.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
 
     def S(self, v):
         return self.s_max / (1 + jnp.exp(self.r * (self.v0 - v) / u.mV))
 
-    def dy1(self, y1, y0, y2, y4, Ip):
+    def dmv(self, y1, y0, y2, y4, Ip):
         return self.Ae * self.be * self.S(Ip + self.a2 * y2 - self.a4 * y4) - 2 * self.be * y1 - self.be ** 2 * y0
 
-    def dy3(self, y3, y0, y2):
+    def dev(self, y3, y0, y2):
         return self.Ae * self.be * self.S(self.a1 * y0) - 2 * self.be * y3 - self.be ** 2 * y2
 
-    def dy5(self, y5, y0, y4, Ii):
+    def div(self, y5, y0, y4, Ii):
         return self.Ai * self.bi * self.S(self.a3 * y0 + Ii) - 2 * self.bi * y5 - self.bi ** 2 * y4
 
     def update(self, Ip=0. * u.mV, Ii=0. * u.mV):
-        y0 = exp_euler_step(lambda y0, y1: y1, self.y0.value, self.y1.value)
-        y2 = exp_euler_step(lambda y2, y3: y3, self.y2.value, self.y3.value)
-        y4 = exp_euler_step(lambda y4, y5: y5, self.y4.value, self.y5.value)
-        y1 = exp_euler_step(self.dy1, self.y1.value, self.y0.value, self.y2.value, self.y4.value, Ip)
-        y3 = exp_euler_step(self.dy3, self.y3.value, self.y0.value, self.y2.value)
-        y5 = exp_euler_step(self.dy5, self.y5.value, self.y0.value, self.y4.value, Ii)
-        self.y0.value = y0
-        self.y1.value = y1
-        self.y2.value = y2
-        self.y3.value = y3
-        self.y4.value = y4
-        self.y5.value = y5
+        M = exp_euler_step(lambda y0, y1: y1, self.M.value, self.Mv.value)
+        E = exp_euler_step(lambda y2, y3: y3, self.E.value, self.Ev.value)
+        I = exp_euler_step(lambda y4, y5: y5, self.I.value, self.Iv.value)
+        Mv = exp_euler_step(self.dmv, self.Mv.value, self.M.value, self.E.value, self.I.value, Ip)
+        Ev = exp_euler_step(self.dev, self.Ev.value, self.M.value, self.E.value)
+        Iv = exp_euler_step(self.div, self.Iv.value, self.M.value, self.I.value, Ii)
+        self.M.value = M
+        self.Mv.value = Mv
+        self.E.value = E
+        self.Ev.value = Ev
+        self.I.value = I
+        self.Iv.value = Iv
         return self.eeg()
 
     def eeg(self):
-        return self.a2 * self.y2.value - self.a4 * self.y4.value
+        return self.a2 * self.E.value - self.a4 * self.I.value
