@@ -42,6 +42,7 @@ from brainmass import Parameter
 from brainstate import maybe_state
 
 
+# %%
 class JansenRitOutput:
     def __init__(self):
         self.M = []
@@ -52,8 +53,6 @@ class JansenRitOutput:
         self.Iv = []
         self.eeg = []
         self.loss = []
-        self.leadfield = []
-        self.sc = []
 
     def finalize(self):
         self.M = jnp.stack(self.M, axis=0)
@@ -68,6 +67,7 @@ class JansenRitOutput:
         pickle.dump
 
 
+# %%
 class Scale:
     def __init__(self, slope: float, fn: Callable = jnp.tanh):
         self.slope = slope
@@ -290,13 +290,13 @@ class JansenRitNetwork(brainstate.nn.Module):
             self.Mv.value = ddMv
 
             # update placeholders for E buffer
-            self.delay.value = self.delay.value.at[0].set(self.E.value)
+            # self.delay.value = self.delay.value.at[0].set(self.E.value)
 
         def one_duration(input_one_batch):
             # input_one_batch: [n_time, n_input]
             brainstate.transform.for_loop(one_time, input_one_batch)
             self.delay.value = jnp.concatenate((jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0)
-            eeg = self.s2o_coef * self.cy0 * jnp.matmul(lm_t, self.E.value - self.I.value) - self.y0
+            eeg_ = self.s2o_coef * self.cy0 * jnp.matmul(lm_t, self.E.value - self.I.value) - self.y0
             return {
                 'M': self.M.value,
                 'I': self.I.value,
@@ -304,12 +304,13 @@ class JansenRitNetwork(brainstate.nn.Module):
                 'Mv': self.Mv.value,
                 'Ev': self.Ev.value,
                 'Iv': self.Iv.value,
-                'eeg': eeg,
+                'eeg': eeg_,
             }
 
         return brainstate.transform.for_loop(one_duration, inputs)
 
 
+# %%
 class ModelFitting:
     def __init__(
         self,
@@ -337,8 +338,8 @@ class ModelFitting:
 
         def f_loss():
             out = self.model(inputs)
-            loss = 10. * self.cost(out['eeg'], targets)
-            return loss, out
+            loss_ = 10. * self.cost(out['eeg'], targets)
+            return loss_, out
 
         f_grad = brainstate.transform.grad(f_loss, grad_states=self.weights, return_value=True, has_aux=True)
         grads, loss, out_batch = f_grad()
@@ -379,10 +380,6 @@ class ModelFitting:
 
         # placeholders for the history of model parameters
         output = JansenRitOutput()
-        # if self.model.fit_gains_flat:
-        #     output.sc.append(self.model.effective_sc()[mask])  # sc weights history
-        # if self.model.fit_lfm_flat:
-        #     output.leadfield.append(self.model.lm.value)
 
         duration = self.n_duration_per_batch
         num_durations = int(data.shape[0] / duration)
@@ -403,10 +400,6 @@ class ModelFitting:
                 output_eeg.append(out_batch['eeg'])
                 output.loss.append(loss)
                 losses.append(loss)
-                # if self.model.fit_gains_flat:
-                #     output.sc.append(self.model.effective_sc()[mask])
-                # if self.model.fit_lfm_flat:
-                #     output.leadfield.append(self.model.lm.value)
 
             # Calculate metrics like model_fit_LM.py
             fc = np.corrcoef(data.T)
@@ -442,12 +435,12 @@ class ModelFitting:
         
         Parameters
         ----------
-        data: np.ndarray
-            Empirical data [n_time, n_channels]
         uuu: np.ndarray  
             Input stimulation [n_time, n_nodes]
         base_batch_num: int
             Number of baseline batches before actual data (like warmup)
+        data: np.ndarray
+            Empirical data [n_time, n_channels]
         """
         duration = self.n_duration_per_batch
         transient_num = 10  # Skip first 10 timepoints like model_fit_LM.py
@@ -501,6 +494,7 @@ class ModelFitting:
         return output
 
 
+# %%
 class DistCost:
     def __call__(self, sim, emp):
         return jnp.sqrt(jnp.mean((sim - emp) ** 2))
@@ -688,20 +682,13 @@ def train_one_subject(sub_index):
     uuu_test[110:120] = 1000
     test_out = fitter.test(uuu_test, base_batch_num=20, data=data_mean[900:1300])
 
-    # filename = f'reproduce_fig/sub_{sub_index}_fittingresults_stim_exp.pkl'
-    # with open(filename, 'wb') as f:
-    #     pickle.dump(fitter, f)
     # outfilename = f'reproduce_fig/sub_{sub_index}_simEEG_stim_exp.pkl'
     # with open(outfilename, 'wb') as f:
     #     pickle.dump({'train': train_out, 'test': test_out}, f)
     #
-    # sc_mod = np.zeros((node_size, node_size))
-    # mask = np.tril_indices(node_size, -1)
-    # sc_mod[mask] = train_out.weights[-10:, :].mean(0)
-    # sc_mod = sc_mod + sc_mod.T
-    #
+    # sc = net.effective_sc()
     # fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-    # ax.imshow(np.log1p(sc_mod), cmap='bwr')
+    # ax.imshow(np.log1p(sc), cmap='bwr')
     # plt.show()
     #
     # fig, ax = plt.subplots(1, 3, figsize=(12, 8))

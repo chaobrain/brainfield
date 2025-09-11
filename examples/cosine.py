@@ -16,11 +16,11 @@
 
 from typing import Optional
 
+import jax
 import jax.numpy as jnp
-from jax import jit
 
 
-@jit
+@jax.jit
 def cosine_similarity(X: jnp.ndarray, Y: Optional[jnp.ndarray] = None) -> jnp.ndarray:
     """
     Compute cosine similarity between samples in X and Y.
@@ -68,6 +68,7 @@ def cosine_similarity(X: jnp.ndarray, Y: Optional[jnp.ndarray] = None) -> jnp.nd
     return jnp.nan_to_num(cosine_sim)
 
 
+@jax.jit
 def cosine_similarity_safe(X: jnp.ndarray, Y: Optional[jnp.ndarray] = None) -> jnp.ndarray:
     """
     Compute cosine similarity with explicit handling of zero vectors.
