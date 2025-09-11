@@ -26,6 +26,8 @@
 # 
 # and replate the path in the ``reproduce_Momi_et_al_2022/leadfield_from_mne`` directory.
 # %%
+import pickle
+from pathlib import Path
 from typing import Union, Callable
 
 import brainunit as u
@@ -36,7 +38,7 @@ import scipy
 from sklearn.metrics.pairwise import cosine_similarity
 
 import brainstate
-from brainmass.param import Parameter
+from brainmass import Parameter
 from brainstate import maybe_state
 
 
@@ -61,6 +63,9 @@ class JansenRitOutput:
         self.Ev = jnp.stack(self.Ev, axis=0)
         self.Iv = jnp.stack(self.Iv, axis=0)
         self.eeg = jnp.stack(self.eeg, axis=0)
+
+    def pickle(self, fn: str | Path):
+        pickle.dump
 
 
 class Scale:
@@ -118,6 +123,7 @@ class JansenRitNetwork(brainstate.nn.Module):
         dist: np.ndarray,
         w_bb: np.ndarray,
 
+        # parameters
         A: Union[brainstate.typing.ArrayLike, Callable] = 3.25,
         a: Union[brainstate.typing.ArrayLike, Callable] = 100.0,
         B: Union[brainstate.typing.ArrayLike, Callable] = 22.0,
@@ -145,10 +151,6 @@ class JansenRitNetwork(brainstate.nn.Module):
         u_2ndsys_ub: float = 500.,  # the bound of the input for second order system
         noise_std_lb: float = 150.0,  # lower bound of std of noise
 
-        # flags
-        fit_gains_flat: bool = False,
-        fit_lfm_flat: bool = False,
-
         # initializers
         hidden_init: Callable = brainstate.init.Uniform(0., 5.0),
         delay_init: Callable = brainstate.init.Uniform(0., 5.0),
@@ -165,6 +167,7 @@ class JansenRitNetwork(brainstate.nn.Module):
         self.sc = sc  # [hidden_size, hidden_size]
         self.lm = lm  # [output_size, hidden_size]
         self.dist = dist  # [hidden_size, hidden_size]
+        self.w_bb = w_bb  # [hidden_size, hidden_size]
 
         self.A = brainstate.init.param(A, self.hidden_size)
         self.a = brainstate.init.param(a, self.hidden_size)
@@ -192,11 +195,6 @@ class JansenRitNetwork(brainstate.nn.Module):
         self.conduct_lb = brainstate.init.param(conduct_lb, self.hidden_size)
         self.u_2ndsys_ub = brainstate.init.param(u_2ndsys_ub, self.hidden_size)
         self.noise_std_lb = brainstate.init.param(noise_std_lb, self.hidden_size)
-
-        self.fit_gains_flat = fit_gains_flat
-        self.fit_lfm_flat = fit_lfm_flat
-        self.w_bb = Parameter(w_bb) if fit_gains_flat else w_bb
-        self.lm = Parameter(lm) if fit_lfm_flat else lm
 
     def init_state(self, batch_size=None, **kwargs):
         size = (self.hidden_size,) if batch_size is None else (batch_size, self.hidden_size)
@@ -230,7 +228,7 @@ class JansenRitNetwork(brainstate.nn.Module):
         w_n = w2 / u.math.linalg.norm(w2)
         return w_n
 
-    def update(self, input):
+    def update(self, inputs):
         # input: [n_duration, n_time, n_input]
 
         dt = brainstate.environ.get_dt() / u.second
@@ -253,7 +251,6 @@ class JansenRitNetwork(brainstate.nn.Module):
         w_n = self.effective_sc()
         dg = -jnp.diag(jnp.sum(w_n, axis=1))
 
-        scaleV = Scale(1e3)
         scaleI = Scale(self.u_2ndsys_ub)
         lm_t = self.lm - 1 / self.output_size * jnp.matmul(jnp.ones((1, self.output_size)), self.lm)
         delay_step = jnp.asarray(self.dist / (self.conduct_lb + mu), dtype=np.int32)
@@ -261,6 +258,7 @@ class JansenRitNetwork(brainstate.nn.Module):
         def one_time(input_one_time):
             # delayed E
             Ed = u.math.gather(self.delay.value, 0, delay_step)
+
             # weights on delayed E
             LEd = jnp.sum(w_n * Ed, axis=1)
 
@@ -290,12 +288,6 @@ class JansenRitNetwork(brainstate.nn.Module):
             self.Ev.value = ddEv
             self.Iv.value = ddIv
             self.Mv.value = ddMv
-            # self.E.value = scaleV(ddE)
-            # self.I.value = scaleV(ddI)
-            # self.M.value = scaleV(ddM)
-            # self.Ev.value = scaleV(ddEv)
-            # self.Iv.value = scaleV(ddIv)
-            # self.Mv.value = scaleV(ddMv)
 
             # update placeholders for E buffer
             self.delay.value = self.delay.value.at[0].set(self.E.value)
@@ -303,17 +295,19 @@ class JansenRitNetwork(brainstate.nn.Module):
         def one_duration(input_one_batch):
             # input_one_batch: [n_time, n_input]
             brainstate.transform.for_loop(one_time, input_one_batch)
-            self.delay.value = jnp.concatenate(
-                (jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0
-            )
+            self.delay.value = jnp.concatenate((jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0)
             eeg = self.s2o_coef * self.cy0 * jnp.matmul(lm_t, self.E.value - self.I.value) - self.y0
-            return (
-                self.M.value, self.I.value, self.E.value,
-                self.Mv.value, self.Ev.value, self.Iv.value,
-                eeg
-            )
+            return {
+                'M': self.M.value,
+                'I': self.I.value,
+                'E': self.E.value,
+                'Mv': self.Mv.value,
+                'Ev': self.Ev.value,
+                'Iv': self.Iv.value,
+                'eeg': eeg,
+            }
 
-        return brainstate.transform.for_loop(one_duration, input)
+        return brainstate.transform.for_loop(one_duration, inputs)
 
 
 class ModelFitting:
@@ -323,6 +317,7 @@ class ModelFitting:
         optimizer: brainstate.optim.Optimizer,
         duration_per_batch: u.Quantity,
         time_per_duration: u.Quantity,
+        grad_clip: float = 1.0,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -333,23 +328,21 @@ class ModelFitting:
         dt = brainstate.environ.get_dt()
         self.n_duration_per_batch = int(duration_per_batch / time_per_duration)
         self.n_time_per_duration = int(time_per_duration / dt)
+        self.grad_clip = grad_clip
 
     @brainstate.transform.jit(static_argnums=0)
     def _batch_train(self, inputs, targets):
         # inputs: [n_duration, n_time_per_duration, n_input]
         # targets: [n_duration, n_time_per_duration, n_output]
 
-        brainstate.nn.init_all_states(self.model)
-
         def f_loss():
             out = self.model(inputs)
-            M_batch, I_batch, E_batch, Mv_batch, Ev_batch, Iv_batch, eeg_batch = out
-            loss = 10. * self.cost(eeg_batch, targets)
+            loss = 10. * self.cost(out['eeg'], targets)
             return loss, out
 
-        grads, loss, out_batch = brainstate.transform.grad(
-            f_loss, grad_states=self.weights, return_value=True, has_aux=True)()
-
+        f_grad = brainstate.transform.grad(f_loss, grad_states=self.weights, return_value=True, has_aux=True)
+        grads, loss, out_batch = f_grad()
+        grads = brainstate.functional.clip_grad_norm(grads, self.grad_clip)
         # jax.debug.print("Gradients = {g}", g=jax.tree.map(lambda x: jnp.max(jnp.abs(x)), grads))
         self.optimizer.update(grads)
         return loss, out_batch
@@ -359,13 +352,26 @@ class ModelFitting:
         data: np.ndarray,
         uuu: np.ndarray,
         n_epoch: int,
-        epoch_min: int = 110,  # run minimum epoch # part of stop criteria
+        epoch_min: int = 10,  # run minimum epoch # part of stop criteria
         r_lb: float = 0.85,  # lowest pearson correlation # part of stop criteria
     ) -> JansenRitOutput:
-        # data: [n_data, n_time, n_out]
-        # uuu: [n_data, n_in, n_time]
-        duration = self.n_duration_per_batch
-        time = self.n_time_per_duration
+        """
+        Train function following model_fit_LM.py logic
+        
+        Parameters
+        ---------- 
+        data: np.ndarray
+            Empirical data [n_time, n_channels]
+        uuu: np.ndarray
+            Input stimulation [n_time, n_nodes]
+        n_epoch: int
+            Number of training epochs
+        epoch_min: int
+            Minimum number of epochs to run before checking stop criteria
+        r_lb: float
+            Lower bound of Pearson correlation to stop training
+        """
+        brainstate.nn.init_all_states(self.model)
 
         # define masks for getting lower triangle matrix
         mask = np.tril_indices(self.model.hidden_size, -1)
@@ -373,12 +379,14 @@ class ModelFitting:
 
         # placeholders for the history of model parameters
         output = JansenRitOutput()
-        if self.model.fit_gains_flat:
-            output.sc.append(self.model.effective_sc()[mask])  # sc weights history
-        if self.model.fit_lfm_flat:
-            output.leadfield.append(self.model.lm.value)
+        # if self.model.fit_gains_flat:
+        #     output.sc.append(self.model.effective_sc()[mask])  # sc weights history
+        # if self.model.fit_lfm_flat:
+        #     output.leadfield.append(self.model.lm.value)
 
+        duration = self.n_duration_per_batch
         num_durations = int(data.shape[0] / duration)
+
         for i_epoch in range(n_epoch):
             losses = []
             output_eeg = []
@@ -386,23 +394,24 @@ class ModelFitting:
                 inputs = uuu[i_duration * duration:(i_duration + 1) * duration]
                 targets = data[i_duration * duration:(i_duration + 1) * duration]
                 loss, out_batch = self._batch_train(inputs, targets)
-                output.M.append(out_batch[0])
-                output.E.append(out_batch[1])
-                output.I.append(out_batch[2])
-                output.Mv.append(out_batch[3])
-                output.Ev.append(out_batch[4])
-                output.Iv.append(out_batch[5])
-                output_eeg.append(out_batch[6])
+                output.M.append(out_batch['M'])
+                output.E.append(out_batch['E'])
+                output.I.append(out_batch['I'])
+                output.Mv.append(out_batch['Mv'])
+                output.Ev.append(out_batch['Ev'])
+                output.Iv.append(out_batch['Iv'])
+                output_eeg.append(out_batch['eeg'])
                 output.loss.append(loss)
                 losses.append(loss)
-                if self.model.fit_gains_flat:
-                    output.sc.append(self.model.effective_sc()[mask])
-                if self.model.fit_lfm_flat:
-                    output.leadfield.append(self.model.lm.value)
+                # if self.model.fit_gains_flat:
+                #     output.sc.append(self.model.effective_sc()[mask])
+                # if self.model.fit_lfm_flat:
+                #     output.leadfield.append(self.model.lm.value)
 
+            # Calculate metrics like model_fit_LM.py
             fc = np.corrcoef(data.T)
             ts_sim = np.concatenate(output_eeg, axis=0)
-            fc_sim = np.corrcoef(ts_sim[10:].T)
+            fc_sim = np.corrcoef(ts_sim[10:].T)  # Skip first 10 timepoints
             corr = np.corrcoef(fc_sim[mask_e], fc[mask_e])[0, 1]
             cos_sim = np.diag(cosine_similarity(ts_sim.T, data.T)).mean()
 
@@ -420,45 +429,154 @@ class ModelFitting:
     @brainstate.transform.jit(static_argnums=0)
     def _batch_predict(self, inputs):
         # inputs: [n_duration, n_time, n_input]
-        brainstate.nn.init_all_states(self.model)
-        out_batch = self.model(inputs)
-        # M_batch, I_batch, E_batch, Mv_batch, Ev_batch, Iv_batch, eeg_batch = out
-        return out_batch
+        return self.model(inputs)
 
-    # def test(
-    #     self,
-    #     data: np.ndarray,
-    #     uuu: np.ndarray,
-    # ) -> JansenRitOutput:
-    #     # data: [n_data, n_out, n_time]
-    #     # uuu: [n_data, n_in, n_time]
-    #
-    #     duration = self.n_duration_per_batch
-    #     time = self.n_time_per_duration
-    #     num_batches = int(data.shape[0] / duration)
-    #
-    #     output = JansenRitOutput()
-    #     u_hat = np.zeros(
-    #         (duration, time, base_batch_num * batch_size + self.ts.shape[2]))
-    #     u_hat[:, :, base_batch_num * batch_size:] = uuu
-    #
-    #     # Perform the training in batches.
-    #     for i_batch in range(num_batches):
-    #         inputs = u_hat[i_batch * duration:(i_batch + 1) * duration]
-    #         out_batch = self._batch_predict(inputs)
-    #         output.M.append(out_batch[0])
-    #         output.E.append(out_batch[1])
-    #         output.I.append(out_batch[2])
-    #         output.Mv.append(out_batch[3])
-    #         output.Ev.append(out_batch[4])
-    #         output.Iv.append(out_batch[5])
-    #         output.eeg.append(out_batch[6])
-    #     return output
+    def test(
+        self,
+        uuu: np.ndarray,
+        base_batch_num: int = 20,
+        data: np.ndarray = None,
+    ) -> JansenRitOutput:
+        """
+        Test function following model_fit_LM.py logic
+        
+        Parameters
+        ----------
+        data: np.ndarray
+            Empirical data [n_time, n_channels]
+        uuu: np.ndarray  
+            Input stimulation [n_time, n_nodes]
+        base_batch_num: int
+            Number of baseline batches before actual data (like warmup)
+        """
+        duration = self.n_duration_per_batch
+        transient_num = 10  # Skip first 10 timepoints like model_fit_LM.py
+
+        # Initialize model with specific initial conditions
+        brainstate.nn.init_all_states(self.model)
+
+        output = JansenRitOutput()
+
+        # Create extended input like model_fit_LM.py:
+        # u_hat has extra baseline batches + actual data
+        total_time_steps = base_batch_num * duration + uuu.shape[0]
+        u_hat = np.zeros((total_time_steps, *uuu.shape[1:]))
+        u_hat[base_batch_num * duration:] = uuu  # Put actual input after baseline
+
+        # Calculate total number of batches (baseline + actual)
+        total_batches = int(total_time_steps / duration)
+
+        # Process in batches like model_fit_LM.py
+        for i_batch in range(total_batches):
+            start_idx = i_batch * duration
+            end_idx = (i_batch + 1) * duration
+
+            # Get batch input and reshape to [n_duration, n_time, n_input]
+            batch_input = u_hat[start_idx:end_idx]
+
+            # Run model prediction (no gradients needed for test)
+            out_batch = self._batch_predict(batch_input)
+
+            # Only collect outputs after baseline batches (like model_fit_LM.py)
+            if i_batch >= base_batch_num:
+                output.M.append(out_batch['M'])
+                output.E.append(out_batch['E'])
+                output.I.append(out_batch['I'])
+                output.Mv.append(out_batch['Mv'])
+                output.Ev.append(out_batch['Ev'])
+                output.Iv.append(out_batch['Iv'])
+                output.eeg.append(out_batch['eeg'])
+
+        # Compute correlation metrics like model_fit_LM.py
+        if data is not None:
+            ts_sim = np.concatenate(output.eeg, axis=0)
+            fc_sim = np.corrcoef(ts_sim[transient_num:].T)  # Skip transients
+            fc_emp = np.corrcoef(data.T)
+
+            mask_e = np.tril_indices(self.model.output_size, -1)
+            corr = np.corrcoef(fc_sim[mask_e], fc_emp[mask_e])[0, 1]
+            cos_sim = np.diag(cosine_similarity(ts_sim.T, data.T)).mean()
+            print(f'Test - Pearson correlation: {corr:.3f}, Cosine similarity: {cos_sim:.3f}')
+
+        return output
 
 
 class DistCost:
     def __call__(self, sim, emp):
         return jnp.sqrt(jnp.mean((sim - emp) ** 2))
+
+
+class BeamformCost:
+    def __call__(self, lm, emp):
+        # leadfield: [n_out, n_hidden]
+        # emp: [n_time, n_hidden]
+        corr = jnp.matmul(emp, emp.T)
+        corr_inv = jnp.linalg.inv(corr)
+        corr_inv_s = jnp.linalg.inv(jnp.matmul(lm.T, jnp.matmul(corr_inv, lm)))
+        W = jnp.matmul(corr_inv_s, jnp.matmul(lm.T, corr_inv))
+        return jnp.trace(jnp.matmul(W, jnp.matmul(corr, W.T)))
+
+
+class RCost:
+    def __call__(self, logits_series_tf, labels_series_tf):
+        """
+        Calculate the Pearson Correlation between the simFC and empFC.
+        From there, the probability and negative log-likelihood.
+
+        Parameters
+        ----------
+        logits_series_tf: tensor with node_size X datapoint
+            simulated BOLD
+        labels_series_tf: tensor with node_size X datapoint
+            empirical BOLD
+        """
+        # get node_size(batch_size) and batch_size()
+        node_size = logits_series_tf.shape[0]
+
+        # remove mean across time
+        labels_series_tf_n = labels_series_tf - jnp.reshape(jnp.mean(labels_series_tf, 1),
+                                                            [node_size, 1])
+
+        logits_series_tf_n = logits_series_tf - jnp.reshape(jnp.mean(logits_series_tf, 1),
+                                                            [node_size, 1])
+
+        #  jnp
+        cov_sim = jnp.matmul(logits_series_tf_n, jnp.transpose(logits_series_tf_n, (0, 1)))
+        cov_def = jnp.matmul(labels_series_tf_n, jnp.transpose(labels_series_tf_n, (0, 1)))
+
+        # fc for sim and empirical BOLDs
+        FC_sim_T = jnp.matmul(
+            jnp.matmul(jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_sim)))), cov_sim),
+            jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_sim))))
+        )
+        FC_T = jnp.matmul(
+            jnp.matmul(jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_def)))), cov_def),
+            jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_def))))
+        )
+
+        # mask for lower triangle without diagonal
+        ones_tri = jnp.tril(jnp.ones_like(FC_T), -1)
+        zeros = jnp.zeros_like(FC_T)  # create a tensor all ones
+        mask = jnp.greater(ones_tri, zeros)  # boolean tensor, mask[i] = True iff x[i] > 1
+
+        # mask out fc to vector with elements of the lower triangle
+        FC_tri_v = jnp.where(mask, FC_T, 0)
+        FC_sim_tri_v = jnp.where(mask, FC_sim_T, 0)
+
+        # remove the mean across the elements
+        FC_v = FC_tri_v - jnp.mean(FC_tri_v)
+        FC_sim_v = FC_sim_tri_v - jnp.mean(FC_sim_tri_v)
+
+        # corr_coef
+        corr_FC = (
+            jnp.sum(jnp.multiply(FC_v, FC_sim_v))
+            * jnp.reciprocal(jnp.sqrt(jnp.sum(jnp.multiply(FC_v, FC_v))))
+            * jnp.reciprocal(jnp.sqrt(jnp.sum(jnp.multiply(FC_sim_v, FC_sim_v))))
+        )
+
+        # use surprise: corr to calculate probability and -log
+        losses_corr = -jnp.log(0.5000 + 0.5 * corr_FC)  # torch.mean((FC_v -FC_sim_v)**2)#
+        return losses_corr
 
 
 # %%
@@ -527,47 +645,48 @@ def train_one_subject(sub_index):
     # data_mean: [2000, 62]
 
     lm = np.load(f'{files_dir}/leadfield_from_mne/sub{str(sub_index + 1).zfill(3)}/leadfield.npy', allow_pickle=True)
+    # Initialize parameters to match model_fit_LM.py initialization strategy
     net = JansenRitNetwork(
         sc=sc,
-        lm=brainstate.random.normal(lm, 1.0 / (1.0 + lm_v)),
-        w_bb=brainstate.random.normal(sc, 1 / 50.0),
+        lm=lm + lm_v,  # Use base leadfield matrix
+        w_bb=Parameter(sc + 0.05 * np.ones_like(sc)),  # Initialize w_bb similar to model_fit_LM.py
         dist=dist,
-        A=3.25,
-        a=Parameter(brainstate.random.normal(100., 1 / 0.5)),
-        B=22.,
-        b=Parameter(brainstate.random.normal(50., 1.0)),
-        g=Parameter(brainstate.random.normal(1000., 1 / 0.1)),
-        c1=Parameter(brainstate.random.normal(135, 1 / 0.2)),
-        c2=Parameter(brainstate.random.normal(135 * 0.8, 1 / 0.4)),
-        c3=Parameter(brainstate.random.normal(135 * 0.25, 1 / 0.8)),
-        c4=Parameter(brainstate.random.normal(135 * 0.25, 1 / 0.8)),
-        std_in=Parameter(brainstate.random.normal(100., 1 / 10.)),
+        A=Parameter(3.25 + np.random.randn() * 0.1),  # Add small random noise
+        a=Parameter(100. + np.random.randn() * 2.0),  # Match model_fit_LM.py variance
+        B=Parameter(22. + np.random.randn() * 0.1),
+        b=Parameter(50. + np.random.randn() * 1.0),
+        g=Parameter(1000. + np.random.randn() * 100.0),  # Match model_fit_LM.py variance
+        c1=Parameter(135 + np.random.randn() * 5.0),
+        c2=Parameter(135 * 0.8 + np.random.randn() * 2.5),
+        c3=Parameter(135 * 0.25 + np.random.randn() * 1.25),
+        c4=Parameter(135 * 0.25 + np.random.randn() * 1.25),
+        std_in=Parameter(100. + np.random.randn() * 10.),
         vmax=5.0,
         v0=6.0,
         r=0.56,
-        y0=Parameter(brainstate.random.normal(2.0, 1 / 2.0, output_size)),
-        mu=Parameter(brainstate.random.normal(1., 1 / 2.5)),
-        k=Parameter(brainstate.random.normal(10., 1 / 0.3)),
+        y0=Parameter(2.0 * np.ones(output_size) + np.random.randn(output_size) * 0.5),
+        mu=Parameter(1. + np.random.randn() * 0.4),
+        k=Parameter(10. + np.random.randn() * 3.3),
         cy0=5.0,
         ki=stim_weights,
-        fit_gains_flat=True,
     )
 
     fitter = ModelFitting(
         net,
-        optimizer=brainstate.optim.Adam(1e-3),
+        optimizer=brainstate.optim.Adam(5e-2),  # Match model_fit_LM.py learning rate
         duration_per_batch=batch_size * tr,
         time_per_duration=tr,
     )
 
-    # uuu: [n_time, batch_size, node_size]
-    uuu = np.zeros((400, n_time_per_duration, node_size))
-    uuu[110:120] = 1000
-    train_out = fitter.train(data_mean[900:1300], uuu, n_epoch=120)
+    # Create input stimulation like model_fit_LM.py: [n_time, n_nodes]
+    uuu = np.zeros((400, node_size))  # [n_time, n_nodes]
+    uuu[110:120] = 1000  # Stimulation from time 110 to 120
+    train_out = fitter.train(data_mean[900:1300], uuu, n_epoch=200)
 
-    uuu = np.zeros((400, n_time_per_duration, node_size))
-    uuu[110:120] = 1000
-    test_out = fitter.test(data_mean[900:1300], uuu)
+    # Test with same stimulation
+    uuu_test = np.zeros((400, node_size))
+    uuu_test[110:120] = 1000
+    test_out = fitter.test(uuu_test, base_batch_num=20, data=data_mean[900:1300])
 
     # filename = f'reproduce_fig/sub_{sub_index}_fittingresults_stim_exp.pkl'
     # with open(filename, 'wb') as f:
