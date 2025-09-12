@@ -30,16 +30,19 @@ import pickle
 from pathlib import Path
 from typing import Union, Callable
 
+import brainstate
 import brainunit as u
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import scipy
+from brainstate import maybe_state
 from sklearn.metrics.pairwise import cosine_similarity
 
-import brainstate
-from brainmass import Parameter
-from brainstate import maybe_state
+
+# %%
+class Parameter(brainstate.ParamState, u.CustomArray):
+    pass
 
 
 # %%
@@ -220,10 +223,10 @@ class JansenRitNetwork(brainstate.nn.Module):
         return A * a * u - 2 * a * v - a ** 2 * x
 
     def S(self, v):
-        return maybe_state(self.vmax) / (1 + jnp.exp(maybe_state(self.r) * (maybe_state(self.v0) - v)))
+        return maybe_state(self.vmax) / (1 + u.math.exp(maybe_state(self.r) * (maybe_state(self.v0) - v)))
 
     def effective_sc(self):
-        w = jnp.exp(maybe_state(self.w_bb)) * maybe_state(self.sc)
+        w = u.math.exp(maybe_state(self.w_bb)) * maybe_state(self.sc)
         w2 = u.math.log1p((w + w.T) / 2)
         w_n = w2 / u.math.linalg.norm(w2)
         return w_n
@@ -232,7 +235,7 @@ class JansenRitNetwork(brainstate.nn.Module):
         # input: [n_duration, n_time, n_input]
 
         dt = brainstate.environ.get_dt() / u.second
-        relu = brainstate.functional.relu
+        relu = u.math.relu
 
         g = relu(maybe_state(self.g))
         std_in = relu(maybe_state(self.std_in))
@@ -498,79 +501,6 @@ class ModelFitting:
 class DistCost:
     def __call__(self, sim, emp):
         return jnp.sqrt(jnp.mean((sim - emp) ** 2))
-
-
-class BeamformCost:
-    def __call__(self, lm, emp):
-        # leadfield: [n_out, n_hidden]
-        # emp: [n_time, n_hidden]
-        corr = jnp.matmul(emp, emp.T)
-        corr_inv = jnp.linalg.inv(corr)
-        corr_inv_s = jnp.linalg.inv(jnp.matmul(lm.T, jnp.matmul(corr_inv, lm)))
-        W = jnp.matmul(corr_inv_s, jnp.matmul(lm.T, corr_inv))
-        return jnp.trace(jnp.matmul(W, jnp.matmul(corr, W.T)))
-
-
-class RCost:
-    def __call__(self, logits_series_tf, labels_series_tf):
-        """
-        Calculate the Pearson Correlation between the simFC and empFC.
-        From there, the probability and negative log-likelihood.
-
-        Parameters
-        ----------
-        logits_series_tf: tensor with node_size X datapoint
-            simulated BOLD
-        labels_series_tf: tensor with node_size X datapoint
-            empirical BOLD
-        """
-        # get node_size(batch_size) and batch_size()
-        node_size = logits_series_tf.shape[0]
-
-        # remove mean across time
-        labels_series_tf_n = labels_series_tf - jnp.reshape(jnp.mean(labels_series_tf, 1),
-                                                            [node_size, 1])
-
-        logits_series_tf_n = logits_series_tf - jnp.reshape(jnp.mean(logits_series_tf, 1),
-                                                            [node_size, 1])
-
-        #  jnp
-        cov_sim = jnp.matmul(logits_series_tf_n, jnp.transpose(logits_series_tf_n, (0, 1)))
-        cov_def = jnp.matmul(labels_series_tf_n, jnp.transpose(labels_series_tf_n, (0, 1)))
-
-        # fc for sim and empirical BOLDs
-        FC_sim_T = jnp.matmul(
-            jnp.matmul(jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_sim)))), cov_sim),
-            jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_sim))))
-        )
-        FC_T = jnp.matmul(
-            jnp.matmul(jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_def)))), cov_def),
-            jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(cov_def))))
-        )
-
-        # mask for lower triangle without diagonal
-        ones_tri = jnp.tril(jnp.ones_like(FC_T), -1)
-        zeros = jnp.zeros_like(FC_T)  # create a tensor all ones
-        mask = jnp.greater(ones_tri, zeros)  # boolean tensor, mask[i] = True iff x[i] > 1
-
-        # mask out fc to vector with elements of the lower triangle
-        FC_tri_v = jnp.where(mask, FC_T, 0)
-        FC_sim_tri_v = jnp.where(mask, FC_sim_T, 0)
-
-        # remove the mean across the elements
-        FC_v = FC_tri_v - jnp.mean(FC_tri_v)
-        FC_sim_v = FC_sim_tri_v - jnp.mean(FC_sim_tri_v)
-
-        # corr_coef
-        corr_FC = (
-            jnp.sum(jnp.multiply(FC_v, FC_sim_v))
-            * jnp.reciprocal(jnp.sqrt(jnp.sum(jnp.multiply(FC_v, FC_v))))
-            * jnp.reciprocal(jnp.sqrt(jnp.sum(jnp.multiply(FC_sim_v, FC_sim_v))))
-        )
-
-        # use surprise: corr to calculate probability and -log
-        losses_corr = -jnp.log(0.5000 + 0.5 * corr_FC)  # torch.mean((FC_v -FC_sim_v)**2)#
-        return losses_corr
 
 
 # %%

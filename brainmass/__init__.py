@@ -23,7 +23,6 @@ __all__ = [
     'JansenRitModel',
     'OUProcess',
     'BOLDSignal',
-    'Parameter',
 ]
 
 from .bold import *
@@ -32,4 +31,3 @@ from .jansen_rit import *
 from .noise import *
 from .wilson_cowan import *
 from .wong_wang import *
-from .param import *

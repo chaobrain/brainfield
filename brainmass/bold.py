@@ -18,8 +18,6 @@ from typing import Union, Callable
 import brainstate
 import jax.numpy as jnp
 
-from .integration import ode_rk2_step
-
 __all__ = [
     'BOLDSignal',
 ]
@@ -131,7 +129,9 @@ class BOLDSignal(brainstate.nn.Dynamics):
         return dx, df, dv, dq
 
     def update(self, z):
-        x, f, v, q = ode_rk2_step(self.derivative, (self.x.value, self.f.value, self.v.value, self.q.value), 0., z)
+        x, f, v, q = brainstate.ing.ode_rk2_step(
+            self.derivative, (self.x.value, self.f.value, self.v.value, self.q.value), 0., z
+        )
         self.x.value = x
         self.f.value = f
         self.v.value = v
