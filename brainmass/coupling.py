@@ -14,14 +14,25 @@
 # ==============================================================================
 
 
-from typing import Union
+from typing import Union, Tuple
 
 import brainunit as u
 
 import brainstate
 from brainstate.nn._dynamics import maybe_init_prefetch
 
-Prefetch = Union[brainstate.nn.PrefetchDelayAt, brainstate.nn.PrefetchDelay, brainstate.nn.Prefetch]
+# Typing alias for static type hints
+Prefetch = Union[
+    brainstate.nn.PrefetchDelayAt,
+    brainstate.nn.PrefetchDelay,
+    brainstate.nn.Prefetch,
+]
+# Runtime check tuple for isinstance
+_PREFETCH_TYPES: Tuple[type, ...] = (
+    brainstate.nn.PrefetchDelayAt,
+    brainstate.nn.PrefetchDelay,
+    brainstate.nn.Prefetch,
+)
 
 __all__ = [
     'DiffusiveCoupling',
@@ -75,15 +86,20 @@ class DiffusiveCoupling(brainstate.nn.Module):
         k: float = 1.0
     ):
         super().__init__()
-        assert isinstance(x, Prefetch), f'The first element must be a Prefetch. But got {type(x)}.'
-        assert isinstance(y, Prefetch), f'The second element must be a Prefetch. But got {type(y)}.'
+        if not isinstance(x, _PREFETCH_TYPES):
+            raise TypeError(f'The first argument x must be a Prefetch, got {type(x)}')
+        if not isinstance(y, _PREFETCH_TYPES):
+            raise TypeError(f'The second argument y must be a Prefetch, got {type(y)}')
         self.x = x
         self.y = y
         self.k = k
 
-        # Connection matrix
+        # Connection matrix (support 1D flattened (N_out*N_in,) or 2D (N_out, N_in))
         self.conn = u.math.asarray(conn)
-        assert self.conn.ndim in (1, 2), f'Only support 1d, 2d connection matrix. But we got {self.conn.ndim}d.'
+        if self.conn.ndim not in (1, 2):
+            raise ValueError(
+                f'Connection must be 1D (flattened) or 2D matrix; got {self.conn.ndim}D.'
+            )
 
     @brainstate.nn.call_order(2)
     def init_state(self, *args, **kwargs):
@@ -91,22 +107,49 @@ class DiffusiveCoupling(brainstate.nn.Module):
         maybe_init_prefetch(self.y)
 
     def update(self):
-        y = u.math.expand_dims(self.y(), axis=1)  # (..., 1)
-        delayed_x = self.x().reshape(y.shape[0], -1)
+        # y: (..., N_out)
+        y_val = self.y()
+        if y_val.ndim < 1:
+            raise ValueError(f'y must have at least 1 dimension; got shape {y_val.shape}')
+        n_out = y_val.shape[-1]
+        y_exp = u.math.expand_dims(y_val, axis=-1)  # (..., N_out, 1)
+
+        # x expected shape on trailing dims: (N_out, N_in) or flattened N_out*N_in
+        x_val = self.x()
+        if x_val.ndim < 1:
+            raise ValueError(f'x must have at least 1 dimension; got shape {x_val.shape}')
+
+        # Build (N_out, N_in) connection matrix
         if self.conn.ndim == 1:
-            assert self.conn.size == delayed_x.size, (
-                f'Connection matrix size {self.conn.size} does not '
-                f'match the variable size {delayed_x.size}.'
-            )
-            conn = self.conn.reshape(y.shape[0], -1)
-        elif self.conn.ndim == 2:
-            assert self.conn.shape == delayed_x.shape, (f'Connection matrix shape {self.conn.shape} does not '
-                                                        f'match the variable shape {delayed_x.shape}.')
-            conn = self.conn
+            if self.conn.size % n_out != 0:
+                raise ValueError(
+                    f'Flattened connection length {self.conn.size} is not divisible by N_out={n_out}.'
+                )
+            n_in = self.conn.size // n_out
+            conn2d = u.math.reshape(self.conn, (n_out, n_in))
         else:
-            raise NotImplementedError(f'Only support 1d, 2d connection matrix. But we got {self.conn.ndim}d.')
-        diffusive = conn * (delayed_x - y)
-        return self.k * diffusive.sum(axis=1)
+            conn2d = self.conn
+            if conn2d.shape[0] != n_out:
+                raise ValueError(
+                    f'Connection rows ({conn2d.shape[0]}) must match y size ({n_out}).'
+                )
+            n_in = conn2d.shape[1]
+
+        # Reshape x to (..., N_out, N_in)
+        if x_val.ndim >= 2 and x_val.shape[-2:] == (n_out, n_in):
+            x_mat = x_val
+        elif x_val.shape[-1] == n_out * n_in:
+            x_mat = u.math.reshape(x_val, (*x_val.shape[:-1], n_out, n_in))
+        else:
+            raise ValueError(
+                f'x has incompatible shape {x_val.shape}; expected (..., {n_out}, {n_in}) '
+                f'or flattened (..., {n_out*n_in}).'
+            )
+
+        # Broadcast conn across leading dims if needed
+        diff = x_mat - y_exp  # (..., N_out, N_in)
+        diffusive = diff * conn2d  # broadcasting on leading dims
+        return self.k * diffusive.sum(axis=-1)  # (..., N_out)
 
 
 class AdditiveCoupling(brainstate.nn.Module):
@@ -149,24 +192,34 @@ class AdditiveCoupling(brainstate.nn.Module):
         k: float = 1.0
     ):
         super().__init__()
-        assert isinstance(x, Prefetch), f'The first element must be a Prefetch. But got {type(x)}.'
+        if not isinstance(x, _PREFETCH_TYPES):
+            raise TypeError(f'The first argument x must be a Prefetch, got {type(x)}')
         self.x = x
         self.k = k
 
         # Connection matrix
         self.conn = u.math.asarray(conn)
-        assert self.conn.ndim == 2, f'Only support 2d connection matrix. But we got {self.conn.ndim}d.'
+        if self.conn.ndim != 2:
+            raise ValueError(f'Only support 2D connection matrix; got {self.conn.ndim}D.')
 
     @brainstate.nn.call_order(2)
     def init_state(self, *args, **kwargs):
         maybe_init_prefetch(self.x)
 
     def update(self):
-        delayed_x = self.x()
-        assert self.conn.size == delayed_x.size, (
-            f'Connection matrix size {self.conn.size} does not '
-            f'match the variable size {delayed_x.size}.'
-        )
-        delayed_x = delayed_x.reshape(self.conn.shape)
-        diffusive = self.conn * delayed_x
-        return self.k * diffusive.sum(axis=1)
+        # x expected trailing dims to match connection (N_out, N_in) or flattened N_out*N_in
+        x_val = self.x()
+        n_out, n_in = self.conn.shape
+
+        if x_val.ndim >= 2 and x_val.shape[-2:] == (n_out, n_in):
+            x_mat = x_val
+        elif x_val.shape[-1] == n_out * n_in:
+            x_mat = u.math.reshape(x_val, (*x_val.shape[:-1], n_out, n_in))
+        else:
+            raise ValueError(
+                f'x has incompatible shape {x_val.shape}; expected (..., {n_out}, {n_in}) '
+                f'or flattened (..., {n_out*n_in}).'
+            )
+
+        additive = self.conn * x_mat  # broadcasting on leading dims
+        return self.k * additive.sum(axis=-1)  # (..., N_out)
