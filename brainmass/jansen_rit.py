@@ -24,6 +24,16 @@ __all__ = [
 ]
 
 
+class Scale:
+    def __init__(self, slope: float, fn: Callable = u.math.tanh):
+        self.slope = slope
+        self.fn = fn
+
+    def __call__(self, x):
+        x, unit = u.split_mantissa_unit(x)
+        return u.maybe_decimal(self.slope * self.fn(x / self.slope) * unit)
+
+
 class JansenRitModel(brainstate.nn.Dynamics):
     r"""
     Jansen-Rit neural mass model.
@@ -67,31 +77,72 @@ class JansenRitModel(brainstate.nn.Dynamics):
     excitatory and inhibitory populations, respectively, with the unit of mV. In this study,
     we set both $I_p$ and $I_i$ to zero.
 
-    Standard parameter settings for Jansen-Rit model. Only the
-    value from parameters with a range is estimated in this study::
+    Standard parameter settings for the Jansen-Rit model. Only parameters with a
+    specified "Range" are estimated in this study.
 
-    | Parameter | Description | Default | Range |
-    | :--- | :--- | :--- | :--- |
-    | $A_e$ | Excitatory gain | 3.25 mV | $2.6-9.75 \mathrm{mV}$ |
-    | $A_i$ | Inhibitory gain | 22 mV | $17.6-110.0 \mathrm{mV}$ |
-    | $b_e$ | Excit. time const. | $100 \mathrm{~s}^{-1}$ | $5-150 \mathrm{~s}^{-1}$ |
-    | $b_i$ | Inhib. time const. | $50 \mathrm{~s}^{-1}$ | $25-75 \mathrm{~s}^{-1}$ |
-    | C | Connect. const. | 135 | 65-1350 |
-    | $a_1$ | Connect. param. | 1.0 | 0.5-1.5 |
-    | $a_2$ | Connect. param. | 0.8 | 0.4-1.2 |
-    | $a_3$ | Connect. param. | 0.25 | 0.125-0.375 |
-    | $a_4$ | Connect. param. | 0.25 | 0.125-0.375 |
-    | $v_{\text {max }}$ | Max firing rate | $5 \mathrm{~s}^{-1}$ | - |
-    | $v_0$ | Firing threshold | 6 mV | - |
-    | $r$ | Sigmoid steepness | 0.56 | - |
+    .. list-table::
+       :widths: 12 30 14 18
+       :header-rows: 1
 
+       * - Parameter
+         - Description
+         - Default
+         - Range
+       * - Ae
+         - Excitatory gain
+         - 3.25 mV
+         - 2.6-9.75 mV
+       * - Ai
+         - Inhibitory gain
+         - 22 mV
+         - 17.6-110.0 mV
+       * - be
+         - Excitatory time const.
+         - 100 s^-1
+         - 5-150 s^-1
+       * - bi
+         - Inhibitory time const.
+         - 50 s^-1
+         - 25-75 s^-1
+       * - C
+         - Connectivity constant
+         - 135
+         - 65-1350
+       * - a1
+         - Connectivity parameter
+         - 1.0
+         - 0.5-1.5
+       * - a2
+         - Connectivity parameter
+         - 0.8
+         - 0.4-1.2
+       * - a3
+         - Connectivity parameter
+         - 0.25
+         - 0.125-0.375
+       * - a4
+         - Connectivity parameter
+         - 0.25
+         - 0.125-0.375
+       * - vmax
+         - Max firing rate
+         - 5 s^-1
+         - -
+       * - v0
+         - Firing threshold
+         - 6 mV
+         - -
+       * - r
+         - Sigmoid steepness
+         - 0.56
+         - -
 
     References
     ----------
-    [1] Nunez P L, Srinivasan R. Electric fields of the brain: the neurophysics of EEG[M]. Oxford university press, 2006.
-    [2] Jansen B H, Rit V G. Electroencephalogram and visual evoked potential generation in a mathematical model of
-        coupled cortical columns[J]. Biological cybernetics, 1995, 73(4): 357-366.
-    [3] David O, Friston K J. A neural mass model for MEG/EEG:: coupling and neuronal dynamics[J]. NeuroImage, 2003, 20(3): 1743-1755.
+
+    - [1] Nunez P L, Srinivasan R. Electric fields of the brain: the neurophysics of EEG[M]. Oxford university press, 2006.
+    - [2] Jansen B H, Rit V G. Electroencephalogram and visual evoked potential generation in a mathematical model of coupled cortical columns[J]. Biological cybernetics, 1995, 73(4): 357-366.
+    - [3] David O, Friston K J. A neural mass model for MEG/EEG:: coupling and neuronal dynamics[J]. NeuroImage, 2003, 20(3): 1743-1755.
     """
 
     def __init__(
@@ -115,6 +166,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         Mv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         Ev_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         Iv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
+        fr_scale: Callable = Scale(1e3),
     ):
         super().__init__(size)
 
@@ -122,21 +174,29 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.Ai = brainstate.init.param(Ai, self.varshape)
         self.be = brainstate.init.param(be, self.varshape)
         self.bi = brainstate.init.param(bi, self.varshape)
-        self.C = brainstate.init.param(C, self.varshape)
         self.a1 = brainstate.init.param(a1, self.varshape)
         self.a2 = brainstate.init.param(a2, self.varshape)
         self.a3 = brainstate.init.param(a3, self.varshape)
         self.a4 = brainstate.init.param(a4, self.varshape)
-        self.s_max = brainstate.init.param(s_max, self.varshape)
         self.v0 = brainstate.init.param(v0, self.varshape)
+        self.C = brainstate.init.param(C, self.varshape)
         self.r = brainstate.init.param(r, self.varshape)
+        self.s_max = brainstate.init.param(s_max, self.varshape)
 
+        assert callable(fr_scale), 'fr_scale must be a callable function'
+        assert callable(M_init), 'M_init must be a callable function'
+        assert callable(E_init), 'E_init must be a callable function'
+        assert callable(I_init), 'I_init must be a callable function'
+        assert callable(Mv_init), 'Mv_init must be a callable function'
+        assert callable(Ev_init), 'Ev_init must be a callable function'
+        assert callable(Iv_init), 'Iv_init must be a callable function'
         self.M_init = M_init
         self.E_init = E_init
         self.I_init = I_init
         self.Mv_init = Mv_init
         self.Ev_init = Ev_init
         self.Iv_init = Iv_init
+        self.fr_scale = fr_scale
 
     def init_state(self, batch_size=None, **kwargs):
         self.M = brainstate.HiddenState(brainstate.init.param(self.M_init, self.varshape, batch_size))
@@ -157,22 +217,31 @@ class JansenRitModel(brainstate.nn.Dynamics):
     def S(self, v):
         return self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
 
-    def dmv(self, Mv, M, E, I, inp):
-        return self.Ae * self.be * self.S(inp + self.a2 * E - self.a4 * I) - 2 * self.be * Mv - self.be ** 2 * M
+    def dMv(self, Mv, M, E, I, inp):
+        fr = self.S(self.a2 * E - self.a4 * I + inp)
+        return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Mv - self.be ** 2 * M
 
-    def dev(self, y3, M, E):
-        return self.Ae * self.be * self.S(self.a1 * M) - 2 * self.be * y3 - self.be ** 2 * E
+    def dEv(self, Ev, M, E, inp=0. / u.second):
+        fr = self.S(self.a1 * M) + inp
+        return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Ev - self.be ** 2 * E
 
-    def div(self, Iv, M, I, inp):
-        return self.Ai * self.bi * self.S(self.a3 * M + inp) - 2 * self.bi * Iv - self.bi ** 2 * I
+    def dIv(self, Iv, M, I, inp):
+        fr = self.S(self.a3 * M + inp)
+        return self.Ai * self.bi * self.fr_scale(fr) - 2 * self.bi * Iv - self.bi ** 2 * I
 
-    def update(self, E_inp=0. * u.mV, I_inp=0. * u.mV):
-        M = exp_euler_step(lambda M, Mv: Mv, self.M.value, self.Mv.value)
-        E = exp_euler_step(lambda E, Ev: Ev, self.E.value, self.Ev.value)
-        I = exp_euler_step(lambda I, Iv: Iv, self.I.value, self.Iv.value)
-        Mv = exp_euler_step(self.dmv, self.Mv.value, self.M.value, self.E.value, self.I.value, E_inp)
-        Ev = exp_euler_step(self.dev, self.Ev.value, self.M.value, self.E.value)
-        Iv = exp_euler_step(self.div, self.Iv.value, self.M.value, self.I.value, I_inp)
+    def update(
+        self,
+        M_inp=0. * u.mV,
+        E_inp=0. / u.second,
+        I_inp=0. * u.mV,
+    ):
+        dt = brainstate.environ.get_dt()
+        M = self.M.value + self.Mv.value * dt
+        E = self.E.value + self.Ev.value * dt
+        I = self.I.value + self.Iv.value * dt
+        Mv = exp_euler_step(self.dMv, self.Mv.value, self.M.value, self.E.value, self.I.value, M_inp)
+        Ev = exp_euler_step(self.dEv, self.Ev.value, self.M.value, self.E.value, E_inp)
+        Iv = exp_euler_step(self.dIv, self.Iv.value, self.M.value, self.I.value, I_inp)
         self.M.value = M
         self.E.value = E
         self.I.value = I

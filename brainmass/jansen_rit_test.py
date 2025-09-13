@@ -158,15 +158,15 @@ class TestJansenRitModel:
         Ii = 0.5 * u.mV
 
         # Test dy1 function
-        dy1_val = model.dmv(y1, y0, y2, y4, Ip)
+        dy1_val = model.dMv(y1, y0, y2, y4, Ip)
         assert hasattr(dy1_val, 'mantissa')  # Should be a Quantity with units
 
         # Test dy3 function
-        dy3_val = model.dev(y3, y0, y2)
+        dy3_val = model.dEv(y3, y0, y2)
         assert hasattr(dy3_val, 'mantissa')  # Should be a Quantity with units
 
         # Test dy5 function
-        dy5_val = model.div(y5, y0, y4, Ii)
+        dy5_val = model.dIv(y5, y0, y4, Ii)
         assert hasattr(dy5_val, 'mantissa')  # Should be a Quantity with units
 
         print("[PASS] Derivative functions test passed")
@@ -185,7 +185,7 @@ class TestJansenRitModel:
         # Update with external inputs
         Ip = 2. * u.mV
         Ii = 0. * u.mV
-        output = model.update(E_inp=Ip, I_inp=Ii)
+        output = model.update(M_inp=Ip, I_inp=Ii)
 
         # After one step, states should have evolved
         # The output should be the EEG proxy signal
@@ -224,7 +224,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(E_inp=Ip)
+                return model.update(M_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -251,7 +251,7 @@ class TestJansenRitModel:
 
         def step_run(i, Ip):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(E_inp=Ip)
+                return model.update(M_inp=Ip)
 
         for Ip in input_levels:
             model.init_state()
@@ -282,7 +282,7 @@ class TestJansenRitModel:
 
             def step_run(i, Ip):
                 with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                    return model.update(E_inp=Ip)
+                    return model.update(M_inp=Ip)
 
             # Short simulation
             out = brainstate.transform.for_loop(functools.partial(step_run, Ip=2. * u.mV), np.arange(1000))
@@ -304,7 +304,7 @@ class TestJansenRitModel:
 
         # Update with same input for all batches
         Ip = 2. * u.mV
-        output = model.update(E_inp=Ip)
+        output = model.update(M_inp=Ip)
 
         # Check output shape
         assert output.shape == (batch_size, 2)
@@ -331,7 +331,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(E_inp=Ip)
+                return model.update(M_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -393,7 +393,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(E_inp=Ip)
+                return model.update(M_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -448,7 +448,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(E_inp=Ip)
+                return model.update(M_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
