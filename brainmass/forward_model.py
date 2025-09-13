@@ -16,7 +16,8 @@
 from typing import Union, Callable
 
 import brainstate
-import jax.numpy as jnp
+import braintools
+import brainunit as u
 
 __all__ = [
     'BOLDSignal',
@@ -92,6 +93,7 @@ class BOLDSignal(brainstate.nn.Dynamics):
         tau: Union[brainstate.typing.ArrayLike, Callable] = 0.98,
         rho: Union[brainstate.typing.ArrayLike, Callable] = 0.34,
         V0: float = 0.02,
+        init: Callable = brainstate.init.Constant(1.),
     ):
         super().__init__(in_size)
 
@@ -106,7 +108,7 @@ class BOLDSignal(brainstate.nn.Dynamics):
         self.k2 = 2.
         self.k3 = 2 * self.rho - 0.2
 
-        self.init = brainstate.init.Constant(1.)
+        self.init = init
 
     def init_state(self, batch_size=None, **kwargs):
         self.x = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))
@@ -124,13 +126,13 @@ class BOLDSignal(brainstate.nn.Dynamics):
         x, f, v, q = y
         dx = z - self.k * x - self.gamma * (f - 1)
         df = x
-        dv = (f - jnp.power(v, 1 / self.alpha)) / self.tau
-        E = 1 - jnp.power(1 - self.rho, 1 / f)
-        dq = (f * E / self.rho - jnp.power(v, 1 / self.alpha) * q / v) / self.tau
+        dv = (f - u.math.power(v, 1 / self.alpha)) / self.tau
+        E = 1 - u.math.power(1 - self.rho, 1 / f)
+        dq = (f * E / self.rho - u.math.power(v, 1 / self.alpha) * q / v) / self.tau
         return dx, df, dv, dq
 
     def update(self, z):
-        x, f, v, q = brainstate.ing.ode_rk2_step(
+        x, f, v, q = braintools.quad.ode_rk2_step(
             self.derivative, (self.x.value, self.f.value, self.v.value, self.q.value), 0., z
         )
         self.x.value = x
@@ -144,7 +146,5 @@ class BOLDSignal(brainstate.nn.Dynamics):
                           self.k3 * (1 - self.v.value))
 
 
-
 class LeadField(brainstate.nn.Module):
     pass
-
