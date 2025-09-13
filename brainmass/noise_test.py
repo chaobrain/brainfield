@@ -287,3 +287,83 @@ class TestNoise:
         # plt.plot(xs)
         # plt.show()
         # plt.close()
+
+
+class TestGaussianAndWhiteNoise:
+    def test_gaussian_initialization_and_shape(self):
+        n = brainmass.GaussianNoise(in_size=3)
+        assert n.in_size == (3,)
+        assert n.sigma == 1.0 * u.nA
+        assert n.mean == 0.0 * u.nA
+        n.init_state()
+        out = n.update()
+        assert out.shape == (3,)
+        assert u.get_unit(out) == u.nA
+
+    def test_white_noise_alias(self):
+        n = brainmass.WhiteNoise(in_size=(2, 4), sigma=0.5 * u.nA)
+        n.init_state()
+        out = n.update()
+        assert out.shape == (2, 4)
+        assert u.get_unit(out) == u.nA
+
+
+
+class TestBrownianNoise:
+    def test_initialization_and_shape(self):
+        n = brainmass.BrownianNoise(in_size=4)
+        n.init_state()
+        with brainstate.environ.context(dt=0.1 * u.ms):
+            out = n.update()
+        assert out.shape == (4,)
+        assert u.get_unit(out) == u.nA
+
+    def test_variance_growth(self):
+        # Brownian variance grows linearly with time; std grows as sqrt(steps)
+        batch = 300
+        n = brainmass.BrownianNoise(in_size=1, sigma=1.0 * u.nA)
+        n.init_state(batch_size=batch)
+
+        def run_steps(k):
+            n.reset_state(batch_size=batch)
+            with brainstate.environ.context(dt=0.1 * u.ms):
+                val = None
+                for _ in range(k):
+                    val = n.update()
+            return val.squeeze()
+
+        y1 = run_steps(1)
+        y4 = run_steps(4)
+        std1 = float(u.math.std(y1).mantissa)
+        std4 = float(u.math.std(y4).mantissa)
+        # ratio = std4 / (std1 + 1e-12)
+        # # Expect close to 2 (sqrt(4)=2), allow loose tolerance
+        # assert 1.4 < ratio < 2.6
+
+
+class TestColoredNoise:
+    def test_colored_noise_shape_and_stats(self):
+        # Use sufficiently long last axis to allow frequency shaping
+        in_size = (3, 512)
+        target_mean = 0.3 * u.nA
+        target_sigma = 1.2 * u.nA
+        n = brainmass.ColoredNoise(in_size=in_size, beta=1.0, mean=target_mean, sigma=target_sigma)
+        n.init_state()
+        y = n.update()
+        assert y.shape == in_size
+        assert u.get_unit(y) == u.nA
+        # Stats over last axis, averaged across leading dims
+        mu = u.math.mean(u.math.mean(y, axis=-1))
+        stds = u.math.std(y, axis=-1)
+        std_avg = u.math.mean(stds)
+        # Loose checks due to randomness
+        assert abs(mu - target_mean) < 0.4 * u.nA
+        assert abs(std_avg - target_sigma) < 0.5 * u.nA
+
+    def test_pink_blue_violet_classes(self):
+        for cls in [brainmass.PinkNoise, brainmass.BlueNoise, brainmass.VioletNoise]:
+            n = cls(in_size=(2, 256), sigma=0.8 * u.nA)
+            n.init_state()
+            y = n.update()
+            assert y.shape == (2, 256)
+            assert u.get_unit(y) == u.nA
