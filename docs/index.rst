@@ -85,8 +85,8 @@ We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs
    :maxdepth: 2
    :caption: Examples
 
-   examples/parameter-exploration.ipynb
    examples/wilsonwowan-osillator.ipynb
+   examples/parameter-exploration.ipynb
 
 
 .. toctree::

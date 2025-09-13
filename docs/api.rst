@@ -8,18 +8,13 @@ API Documentation
 
 A large-scale brain network modeling framework typically consists of four hierarchical layers:
 
-
-```scss
-
-Structural Connectivity (DTI / Structural MRI)
-   ↓
-Neural Mass Models (NMMs)
-   ↓
-Biophysical Forward Model
-   ↓
-Observed Signals (EEG, MEG, fMRI BOLD)
-
-```
+    Structural Connectivity (DTI / Structural MRI)
+       ↓
+    Neural Mass Models (NMMs)
+       ↓
+    Biophysical Forward Model
+       ↓
+    Observed Signals (EEG, MEG, fMRI BOLD)
 
 
 
@@ -28,6 +23,8 @@ Node Dynamics
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
+   :template: classtemplate.rst
 
     JansenRitModel
     WilsonCowanModel
@@ -40,6 +37,8 @@ Noise Processes
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
+   :template: classtemplate.rst
 
     OUProcess
     GaussianNoise
@@ -57,6 +56,8 @@ Node Coupling
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
+   :template: classtemplate.rst
 
     DiffusiveCoupling
     AdditiveCoupling
@@ -69,8 +70,10 @@ Forward Models
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
+   :template: classtemplate.rst
 
     BOLDSignal
-    LeadField
+    LeadFieldModel
 
 

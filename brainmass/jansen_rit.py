@@ -34,6 +34,11 @@ class Scale:
         return u.maybe_decimal(self.slope * self.fn(x / self.slope) * unit)
 
 
+class Identity:
+    def __call__(self, x):
+        return x
+
+
 class JansenRitModel(brainstate.nn.Dynamics):
     r"""
     Jansen-Rit neural mass model.
@@ -166,7 +171,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         Mv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         Ev_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         Iv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
-        fr_scale: Callable = Scale(1e3),
+        fr_scale: Callable = Identity(),
     ):
         super().__init__(size)
 
@@ -221,7 +226,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         fr = self.S(self.a2 * E - self.a4 * I + inp)
         return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Mv - self.be ** 2 * M
 
-    def dEv(self, Ev, M, E, inp=0. / u.second):
+    def dEv(self, Ev, M, E, inp=0. * u.Hz):
         fr = self.S(self.a1 * M) + inp
         return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Ev - self.be ** 2 * E
 
@@ -232,7 +237,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
     def update(
         self,
         M_inp=0. * u.mV,
-        E_inp=0. / u.second,
+        E_inp=0. * u.Hz,
         I_inp=0. * u.mV,
     ):
         dt = brainstate.environ.get_dt()
