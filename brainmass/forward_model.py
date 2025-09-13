@@ -20,6 +20,7 @@ import jax.numpy as jnp
 
 __all__ = [
     'BOLDSignal',
+    'LeadField',
 ]
 
 
@@ -141,3 +142,9 @@ class BOLDSignal(brainstate.nn.Dynamics):
         return self.V0 * (self.k1 * (1 - self.q.value) +
                           self.k2 * (1 - self.q.value / self.rho) +
                           self.k3 * (1 - self.v.value))
+
+
+
+class LeadField(brainstate.nn.Module):
+    pass
+
