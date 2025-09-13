@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
+from typing import Callable
 
 import brainstate
 import brainunit as u
@@ -100,6 +101,10 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         # noise
         noise_E: OUProcess = None,  # excitatory noise process
         noise_I: OUProcess = None,  # inhibitory noise process
+
+        # initialization
+        rE_init: Callable = brainstate.init.ZeroInit(),
+        rI_init: Callable = brainstate.init.ZeroInit(),
     ):
         super().__init__(in_size=in_size)
 
@@ -118,16 +123,16 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         self.noise_I = noise_I
         assert isinstance(noise_I, OUProcess) or noise_I is None, "noise_I must be an OUProcess or None"
         assert isinstance(noise_E, OUProcess) or noise_E is None, "noise_E must be an OUProcess or None"
+        self.rE_init = rE_init
+        self.rI_init = rI_init
 
     def init_state(self, batch_size=None, **kwargs):
-        size = self.varshape if batch_size is None else (batch_size,) + self.varshape
-        self.rE = brainstate.HiddenState(brainstate.init.param(jnp.zeros, size))
-        self.rI = brainstate.HiddenState(brainstate.init.param(jnp.zeros, size))
+        self.rE = brainstate.HiddenState(brainstate.init.param(self.rE_init, self.varshape, batch_size))
+        self.rI = brainstate.HiddenState(brainstate.init.param(self.rI_init, self.varshape, batch_size))
 
     def reset_state(self, batch_size=None, **kwargs):
-        size = self.varshape if batch_size is None else (batch_size,) + self.varshape
-        self.rE.value = brainstate.init.param(jnp.zeros, size)
-        self.rI.value = brainstate.init.param(jnp.zeros, size)
+        self.rE.value = brainstate.init.param(self.rE_init, self.varshape, batch_size)
+        self.rI.value = brainstate.init.param(self.rI_init, self.varshape, batch_size)
 
     def F(self, x, a, theta):
         return 1 / (1 + jnp.exp(-a * (x - theta))) - 1 / (1 + jnp.exp(a * theta))
@@ -156,12 +161,12 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         rE_ext = 0. if rE_ext is None else rE_ext
         rI_ext = 0. if rI_ext is None else rI_ext
         if self.noise_E is not None:
-            rE_ext += self.noise_E()
+            rE_ext = rE_ext + self.noise_E()
         rE_ext = self.sum_delta_inputs(rE_ext, label='E')
 
         # inhibitory input
         if self.noise_I is not None:
-            rI_ext += self.noise_I()
+            rI_ext = rI_ext + self.noise_I()
         rI_ext = self.sum_delta_inputs(rI_ext, label='I')
 
         # update the state variables

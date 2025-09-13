@@ -146,16 +146,28 @@ class ColoredNoise(brainstate.nn.Dynamics):
 
 
 class PinkNoise(ColoredNoise):
+    """
+    Pink (1/f) noise.
+    """
+
     def __init__(self, in_size, mean=None, sigma=1. * u.nA):
         super().__init__(in_size=in_size, beta=1.0, mean=mean, sigma=sigma)
 
 
 class BlueNoise(ColoredNoise):
+    """
+    Blue (1/f^2) noise.
+    """
+
     def __init__(self, in_size, mean=None, sigma=1. * u.nA):
         super().__init__(in_size=in_size, beta=-1.0, mean=mean, sigma=sigma)
 
 
 class VioletNoise(ColoredNoise):
+    """
+    Violet (1/f^3) noise.
+    """
+
     def __init__(self, in_size, mean=None, sigma=1. * u.nA):
         super().__init__(in_size=in_size, beta=-2.0, mean=mean, sigma=sigma)
 
@@ -198,8 +210,7 @@ class OUProcess(brainstate.nn.Dynamics):
 
         # parameters
         self.sigma = sigma
-        mean = 0. * u.get_unit(sigma) if mean is None else mean
-        self.mean = mean
+        self.mean = 0. * u.get_unit(sigma) if mean is None else mean
         self.tau = tau
         self.init = init
 

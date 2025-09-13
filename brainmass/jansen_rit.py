@@ -15,10 +15,8 @@
 
 from typing import Union, Callable
 
-import brainunit as u
-import jax.numpy as jnp
-
 import brainstate
+import brainunit as u
 from brainstate.nn import exp_euler_step
 
 __all__ = [
@@ -111,6 +109,12 @@ class JansenRitModel(brainstate.nn.Dynamics):
         s_max: Union[brainstate.typing.ArrayLike, Callable] = 5. / u.second,  # Max firing rate
         v0: Union[brainstate.typing.ArrayLike, Callable] = 6. * u.mV,  # Firing threshold
         r: Union[brainstate.typing.ArrayLike, Callable] = 0.56,  # Sigmoid steepness
+        M_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
+        E_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
+        I_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
+        Mv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
+        Ev_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
+        Iv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
     ):
         super().__init__(size)
 
@@ -127,50 +131,53 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.v0 = brainstate.init.param(v0, self.varshape)
         self.r = brainstate.init.param(r, self.varshape)
 
+        self.M_init = M_init
+        self.E_init = E_init
+        self.I_init = I_init
+        self.Mv_init = Mv_init
+        self.Ev_init = Ev_init
+        self.Iv_init = Iv_init
+
     def init_state(self, batch_size=None, **kwargs):
-        dtype = brainstate.environ.dftype()
-        size = self.varshape if batch_size is None else (batch_size, *self.varshape)
-        self.M = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.Mv = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
-        self.E = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.Ev = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
-        self.I = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV)
-        self.Iv = brainstate.HiddenState(jnp.zeros(size, dtype=dtype) * u.mV / u.second)
+        self.M = brainstate.HiddenState(brainstate.init.param(self.M_init, self.varshape, batch_size))
+        self.E = brainstate.HiddenState(brainstate.init.param(self.E_init, self.varshape, batch_size))
+        self.I = brainstate.HiddenState(brainstate.init.param(self.I_init, self.varshape, batch_size))
+        self.Mv = brainstate.HiddenState(brainstate.init.param(self.Mv_init, self.varshape, batch_size))
+        self.Ev = brainstate.HiddenState(brainstate.init.param(self.Ev_init, self.varshape, batch_size))
+        self.Iv = brainstate.HiddenState(brainstate.init.param(self.Iv_init, self.varshape, batch_size))
 
     def reset_state(self, batch_size=None, **kwargs):
-        dtype = brainstate.environ.dftype()
-        size = self.varshape if batch_size is None else (batch_size, *self.varshape)
-        self.M.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.Mv.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
-        self.E.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.Ev.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
-        self.I.value = jnp.zeros(size, dtype=dtype) * u.mV
-        self.Iv.value = jnp.zeros(size, dtype=dtype) * u.mV / u.second
+        self.M.value = brainstate.init.param(self.M_init, self.varshape, batch_size)
+        self.E.value = brainstate.init.param(self.E_init, self.varshape, batch_size)
+        self.I.value = brainstate.init.param(self.I_init, self.varshape, batch_size)
+        self.Mv.value = brainstate.init.param(self.Mv_init, self.varshape, batch_size)
+        self.Ev.value = brainstate.init.param(self.Ev_init, self.varshape, batch_size)
+        self.Iv.value = brainstate.init.param(self.Iv_init, self.varshape, batch_size)
 
     def S(self, v):
-        return self.s_max / (1 + jnp.exp(self.r * (self.v0 - v) / u.mV))
+        return self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
 
-    def dmv(self, y1, y0, y2, y4, Ip):
-        return self.Ae * self.be * self.S(Ip + self.a2 * y2 - self.a4 * y4) - 2 * self.be * y1 - self.be ** 2 * y0
+    def dmv(self, Mv, M, E, I, inp):
+        return self.Ae * self.be * self.S(inp + self.a2 * E - self.a4 * I) - 2 * self.be * Mv - self.be ** 2 * M
 
-    def dev(self, y3, y0, y2):
-        return self.Ae * self.be * self.S(self.a1 * y0) - 2 * self.be * y3 - self.be ** 2 * y2
+    def dev(self, y3, M, E):
+        return self.Ae * self.be * self.S(self.a1 * M) - 2 * self.be * y3 - self.be ** 2 * E
 
-    def div(self, y5, y0, y4, Ii):
-        return self.Ai * self.bi * self.S(self.a3 * y0 + Ii) - 2 * self.bi * y5 - self.bi ** 2 * y4
+    def div(self, Iv, M, I, inp):
+        return self.Ai * self.bi * self.S(self.a3 * M + inp) - 2 * self.bi * Iv - self.bi ** 2 * I
 
-    def update(self, Ip=0. * u.mV, Ii=0. * u.mV):
-        M = exp_euler_step(lambda y0, y1: y1, self.M.value, self.Mv.value)
-        E = exp_euler_step(lambda y2, y3: y3, self.E.value, self.Ev.value)
-        I = exp_euler_step(lambda y4, y5: y5, self.I.value, self.Iv.value)
-        Mv = exp_euler_step(self.dmv, self.Mv.value, self.M.value, self.E.value, self.I.value, Ip)
+    def update(self, E_inp=0. * u.mV, I_inp=0. * u.mV):
+        M = exp_euler_step(lambda M, Mv: Mv, self.M.value, self.Mv.value)
+        E = exp_euler_step(lambda E, Ev: Ev, self.E.value, self.Ev.value)
+        I = exp_euler_step(lambda I, Iv: Iv, self.I.value, self.Iv.value)
+        Mv = exp_euler_step(self.dmv, self.Mv.value, self.M.value, self.E.value, self.I.value, E_inp)
         Ev = exp_euler_step(self.dev, self.Ev.value, self.M.value, self.E.value)
-        Iv = exp_euler_step(self.div, self.Iv.value, self.M.value, self.I.value, Ii)
+        Iv = exp_euler_step(self.div, self.Iv.value, self.M.value, self.I.value, I_inp)
         self.M.value = M
-        self.Mv.value = Mv
         self.E.value = E
-        self.Ev.value = Ev
         self.I.value = I
+        self.Mv.value = Mv
+        self.Ev.value = Ev
         self.Iv.value = Iv
         return self.eeg()
 

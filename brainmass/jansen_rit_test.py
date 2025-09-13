@@ -185,7 +185,7 @@ class TestJansenRitModel:
         # Update with external inputs
         Ip = 2. * u.mV
         Ii = 0. * u.mV
-        output = model.update(Ip=Ip, Ii=Ii)
+        output = model.update(E_inp=Ip, I_inp=Ii)
 
         # After one step, states should have evolved
         # The output should be the EEG proxy signal
@@ -224,7 +224,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(Ip=Ip)
+                return model.update(E_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -251,7 +251,7 @@ class TestJansenRitModel:
 
         def step_run(i, Ip):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(Ip=Ip)
+                return model.update(E_inp=Ip)
 
         for Ip in input_levels:
             model.init_state()
@@ -282,7 +282,7 @@ class TestJansenRitModel:
 
             def step_run(i, Ip):
                 with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                    return model.update(Ip=Ip)
+                    return model.update(E_inp=Ip)
 
             # Short simulation
             out = brainstate.transform.for_loop(functools.partial(step_run, Ip=2. * u.mV), np.arange(1000))
@@ -304,7 +304,7 @@ class TestJansenRitModel:
 
         # Update with same input for all batches
         Ip = 2. * u.mV
-        output = model.update(Ip=Ip)
+        output = model.update(E_inp=Ip)
 
         # Check output shape
         assert output.shape == (batch_size, 2)
@@ -331,7 +331,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(Ip=Ip)
+                return model.update(E_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -393,7 +393,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(Ip=Ip)
+                return model.update(E_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)
@@ -448,7 +448,7 @@ class TestJansenRitModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(Ip=Ip)
+                return model.update(E_inp=Ip)
 
         indices = np.arange(n_steps)
         outputs = brainstate.transform.for_loop(step_run, indices)

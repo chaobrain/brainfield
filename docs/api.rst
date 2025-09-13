@@ -2,8 +2,25 @@ API Documentation
 =================
 
 
-.. currentmodule:: braintools.input
-.. automodule:: braintools.input
+.. currentmodule:: brainmass
+.. automodule:: brainmass
+
+
+A large-scale brain network modeling framework typically consists of four hierarchical layers:
+
+
+```scss
+
+Structural Connectivity (DTI / Structural MRI)
+   ↓
+Neural Mass Models (NMMs)
+   ↓
+Biophysical Forward Model
+   ↓
+Observed Signals (EEG, MEG, fMRI BOLD)
+
+```
+
 
 
 Node Dynamics
