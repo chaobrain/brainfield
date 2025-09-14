@@ -22,12 +22,13 @@ import numpy as np
 
 import brainmass
 
-brainstate.environ.set(dt=0.1 * u.ms)
+brainstate.environ.set(dt=0.0005 * u.second)
+brainstate.environ.set(dt=0.5 * u.ms)
 
 
-def show(times, data):
+def show(times, data, title):
     M, E, I, eeg = data
-    fig, gs = braintools.visualize.get_figure(4, 1, 3, 10)
+    fig, gs = braintools.visualize.get_figure(4, 1, 1.2, 10)
     fig.add_subplot(gs[0, 0])
     plt.plot(times, M)
     plt.ylabel('M (mV)')
@@ -41,60 +42,99 @@ def show(times, data):
     plt.ylabel('I (mV)')
 
     fig.add_subplot(gs[3])
-    plt.plot(eeg)
+    plt.plot(times, eeg)
     plt.xlabel('Time (ms)')
     plt.ylabel('EEG (mV)')
+
+    plt.suptitle(title)
     plt.show()
 
 
 def alpha_oscillation():
-    node = brainmass.JansenRitModel(
-        1,
-    )
+    # Alpha-like idle rhythm (baseline JR)
+    node = brainmass.JansenRitModel(1)
     brainstate.nn.init_all_states(node)
 
     def step_run(inp):
         eeg = node.update(E_inp=inp)
         return node.M.value, node.E.value, node.I.value, eeg
 
-    indices = np.arange(10000)
-    inputs = brainstate.random.normal(120., 30., indices.shape) * u.Hz
+    dt = brainstate.environ.get_dt()
+    indices = np.arange(int(10 * u.second / dt))
+    inputs = brainstate.random.normal(120., 30. / (dt / u.second) ** 0.5, indices.shape) * u.Hz
     data = brainstate.transform.for_loop(step_run, inputs)
-    show(indices * brainstate.environ.get_dt(), data)
+    show(indices * dt, data, title='Alpha-like oscillation')
 
 
-def beta_oscillation():
-    node = brainmass.JansenRitModel(
-        # 1, a1=135 * 1., a2=135 * 0.8, a3=135 * 0.25, a4=135 * 0.25,
-        1,
-    )
+def sinusoidal_oscillation():
+    # Driven/entrained rhythm via sinusoidal input
+    node = brainmass.JansenRitModel(1)
     brainstate.nn.init_all_states(node)
+    f_drive = 10. * u.Hz
 
     def step_run(i):
-        eeg = node.update(E_inp=320. * u.Hz)
+        tt = i * dt
+        inp = 80 + 70.0 * u.math.sin(2 * u.math.pi * f_drive * tt)
+        eeg = node.update(E_inp=inp * u.Hz)
         return node.M.value, node.E.value, node.I.value, eeg
 
-    indices = np.arange(10000)
+    dt = brainstate.environ.get_dt()
+    indices = np.arange(int(5. * u.second / dt))
     data = brainstate.transform.for_loop(step_run, indices)
-    show(indices * brainstate.environ.get_dt(), data)
+    show(indices * dt, data, title='Sinusoidal-driven oscillation')
 
 
-def resting_state():
-    node = brainmass.JansenRitModel(
-        # 1, a1=135 * 1., a2=135 * 0.8, a3=135 * 0.25, a4=135 * 0.25,
-        1,
-    )
+def spike_wave_oscillation():
+    # Spike–wave–like regime (strong excitation / reduced inhibition)
+    node = brainmass.JansenRitModel(1, Ae=4.5 * u.mV, Ai=18. * u.mV, bi=40. * u.Hz)
     brainstate.nn.init_all_states(node)
 
-    def step_run(i):
-        eeg = node.update(E_inp=90. * u.Hz)
+    def step_run(inp):
+        eeg = node.update(E_inp=inp)
         return node.M.value, node.E.value, node.I.value, eeg
 
-    indices = np.arange(10000)
-    data = brainstate.transform.for_loop(step_run, indices)
-    show(indices * brainstate.environ.get_dt(), data)
+    dt = brainstate.environ.get_dt()
+    indices = np.arange(int(10 * u.second / dt))
+    inputs = brainstate.random.normal(90., 10. / (dt / u.second) ** 0.5, indices.shape) * u.Hz
+    data = brainstate.transform.for_loop(step_run, inputs)
+    show(indices * dt, data, title='Spike-wave-like oscillation')
+
+
+def low_inhibition():
+    # Low inhibition (disinhibited, larger amplitude, slower)
+    node = brainmass.JansenRitModel(1, Ai=15. * u.mV, bi=40. * u.Hz)
+    brainstate.nn.init_all_states(node)
+
+    def step_run(inp):
+        eeg = node.update(E_inp=inp)
+        return node.M.value, node.E.value, node.I.value, eeg
+
+    dt = brainstate.environ.get_dt()
+    indices = np.arange(int(10 * u.second / dt))
+    inputs = brainstate.random.normal(100., 20. / (dt / u.second) ** 0.5, indices.shape) * u.Hz
+    data = brainstate.transform.for_loop(step_run, inputs)
+    show(indices * dt, data, title='Low inhibition oscillation')
+
+
+def irregular_noisy():
+    # Irregular/noisy (higher drive + noise)
+    node = brainmass.JansenRitModel(1)
+    brainstate.nn.init_all_states(node)
+
+    def step_run(inp):
+        eeg = node.update(E_inp=inp)
+        return node.M.value, node.E.value, node.I.value, eeg
+
+    dt = brainstate.environ.get_dt()
+    indices = np.arange(int(10 * u.second / dt))
+    inputs = brainstate.random.normal(220., 80. / (dt / u.second) ** 0.5, indices.shape) * u.Hz
+    data = brainstate.transform.for_loop(step_run, inputs)
+    show(indices * dt, data, title='Irregular/noisy oscillation')
 
 
 if __name__ == '__main__':
     alpha_oscillation()
-    # resting_state()
+    sinusoidal_oscillation()
+    spike_wave_oscillation()
+    low_inhibition()
+    irregular_noisy()

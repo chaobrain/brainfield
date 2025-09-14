@@ -16,8 +16,8 @@
 from typing import Union, Callable
 
 import brainstate
-import brainunit as u
 import braintools
+import brainunit as u
 from brainstate.nn import exp_euler_step
 
 from .noise import Noise
@@ -178,6 +178,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         noise_E: Noise = None,
         noise_I: Noise = None,
         noise_M: Noise = None,
+        method: str = 'exp_euler'
     ):
         super().__init__(in_size)
 
@@ -211,6 +212,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.noise_E = noise_E
         self.noise_I = noise_I
         self.noise_M = noise_M
+        self.method = method
 
     def init_state(self, batch_size=None, **kwargs):
         self.M = brainstate.HiddenState(brainstate.init.param(self.M_init, self.varshape, batch_size))
@@ -229,19 +231,25 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.Iv.value = brainstate.init.param(self.Iv_init, self.varshape, batch_size)
 
     def S(self, v):
-        return 2. * self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
+        # Sigmoid ranges from 0 to s_max, centered at v0
+        return self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
 
     def dMv(self, Mv, M, E, I, inp):
-        fr = self.S(self.C * self.a2 * E - self.C * self.a4 * I + inp)
+        # Pyramidal population driven by the difference of PSPs (no extra C here)
+        fr = self.S(E - I + inp)
         return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Mv - self.be ** 2 * M
 
     def dEv(self, Ev, M, E, inp=0. * u.Hz):
-        fr = self.S(self.C * self.a1 * M) + inp
-        return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Ev - self.be ** 2 * E
+        # Excitatory interneuron population: A*a*(p + C2*S(C1*M)) - 2*a*y' - a^2*y
+        s_M = self.C * self.a2 * self.S(self.C * self.a1 * M)
+        fr_total = self.fr_scale(inp + s_M)
+        return self.Ae * self.be * fr_total - 2 * self.be * Ev - self.be ** 2 * E
 
     def dIv(self, Iv, M, I, inp):
-        fr = self.S(self.C * self.a3 * M + inp)
-        return self.Ai * self.bi * self.fr_scale(fr) - 2 * self.bi * Iv - self.bi ** 2 * I
+        # Inhibitory interneuron population: B*b*(C4*S(C3*M)) - 2*b*y' - b^2*y
+        s_M = self.C * self.a4 * self.S(self.C * self.a3 * M + inp)
+        fr_total = self.fr_scale(s_M)
+        return self.Ai * self.bi * fr_total - 2 * self.bi * Iv - self.bi ** 2 * I
 
     def derivative(self, state, t, M_inp, E_inp, I_inp):
         M, E, I, Mv, Ev, Iv = state
@@ -262,21 +270,18 @@ class JansenRitModel(brainstate.nn.Dynamics):
         M_inp = M_inp if self.noise_M is None else M_inp + self.noise_M()
         E_inp = E_inp if self.noise_E is None else E_inp + self.noise_E()
         I_inp = I_inp if self.noise_I is None else I_inp + self.noise_I()
-        # dt = brainstate.environ.get_dt()
-        # M = self.M.value + self.Mv.value * dt
-        # E = self.E.value + self.Ev.value * dt
-        # I = self.I.value + self.Iv.value * dt
-        # Mv = exp_euler_step(self.dMv, self.Mv.value, self.M.value, self.E.value, self.I.value, M_inp)
-        # Ev = exp_euler_step(self.dEv, self.Ev.value, self.M.value, self.E.value, E_inp)
-        # Iv = exp_euler_step(self.dIv, self.Iv.value, self.M.value, self.I.value, I_inp)
-        M, E, I, Mv, Ev, Iv = braintools.quad.ode_rk4_step(
-            self.derivative,
-            (self.M.value, self.E.value, self.I.value, self.Mv.value, self.Ev.value, self.Iv.value),
-            0. * u.ms,
-            M_inp,
-            E_inp,
-            I_inp
-        )
+        if self.method == 'exp_euler':
+            dt = brainstate.environ.get_dt()
+            M = self.M.value + self.Mv.value * dt
+            E = self.E.value + self.Ev.value * dt
+            I = self.I.value + self.Iv.value * dt
+            Mv = exp_euler_step(self.dMv, self.Mv.value, self.M.value, self.E.value, self.I.value, M_inp)
+            Ev = exp_euler_step(self.dEv, self.Ev.value, self.M.value, self.E.value, E_inp)
+            Iv = exp_euler_step(self.dIv, self.Iv.value, self.M.value, self.I.value, I_inp)
+        else:
+            method = getattr(braintools.quad, f'ode_{self.method}_step')
+            state = (self.M.value, self.E.value, self.I.value, self.Mv.value, self.Ev.value, self.Iv.value)
+            M, E, I, Mv, Ev, Iv = method(self.derivative, state, 0. * u.ms, M_inp, E_inp, I_inp)
         self.M.value = M
         self.E.value = E
         self.I.value = I
@@ -286,4 +291,5 @@ class JansenRitModel(brainstate.nn.Dynamics):
         return self.eeg()
 
     def eeg(self):
-        return self.C * (self.a2 * self.E.value - self.a4 * self.I.value)
+        # EEG-like proxy: difference between excitatory and inhibitory PSPs at pyramidal
+        return self.E.value - self.I.value
