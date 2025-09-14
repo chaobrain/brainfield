@@ -19,7 +19,7 @@ import brainstate
 import brainunit as u
 import jax.numpy as jnp
 
-from .noise import OUProcess
+from .noise import Noise
 
 __all__ = [
     'WilsonCowanModel',
@@ -99,8 +99,8 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         r: brainstate.typing.ArrayLike = 1.,  # refractory parameter (dimensionless)
 
         # noise
-        noise_E: OUProcess = None,  # excitatory noise process
-        noise_I: OUProcess = None,  # inhibitory noise process
+        noise_E: Noise = None,  # excitatory noise process
+        noise_I: Noise = None,  # inhibitory noise process
 
         # initialization
         rE_init: Callable = brainstate.init.ZeroInit(),
@@ -121,8 +121,8 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         self.r = brainstate.init.param(r, self.varshape)
         self.noise_E = noise_E
         self.noise_I = noise_I
-        assert isinstance(noise_I, OUProcess) or noise_I is None, "noise_I must be an OUProcess or None"
-        assert isinstance(noise_E, OUProcess) or noise_E is None, "noise_E must be an OUProcess or None"
+        assert isinstance(noise_I, Noise) or noise_I is None, "noise_I must be an OUProcess or None"
+        assert isinstance(noise_E, Noise) or noise_E is None, "noise_E must be an OUProcess or None"
         self.rE_init = rE_init
         self.rI_init = rI_init
 

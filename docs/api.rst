@@ -61,6 +61,8 @@ Node Coupling
 
     DiffusiveCoupling
     AdditiveCoupling
+    diffusive_coupling
+    additive_coupling
 
 
 

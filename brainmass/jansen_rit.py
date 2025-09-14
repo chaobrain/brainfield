@@ -17,7 +17,10 @@ from typing import Union, Callable
 
 import brainstate
 import brainunit as u
+import braintools
 from brainstate.nn import exp_euler_step
+
+from .noise import Noise
 
 __all__ = [
     'JansenRitModel',
@@ -67,7 +70,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
     into its mean firing rate. It is expressed as:
 
     $$
-    S(v)=S_{\max } \cdot \frac{1}{1+e^{-r\left(v-v_0\right)}}
+    S(v)=2*S_{\max } \cdot \frac{1}{1+e^{-r\left(v-v_0\right)}}
     $$
 
     The parameters $v_0$ and $r$ regulate the midpoint and steepness of the sigmoidal curve,
@@ -129,9 +132,9 @@ class JansenRitModel(brainstate.nn.Dynamics):
          - Connectivity parameter
          - 0.25
          - 0.125-0.375
-       * - vmax
+       * - smax
          - Max firing rate
-         - 5 s^-1
+         - 2.5 s^-1
          - -
        * - v0
          - Firing threshold
@@ -152,17 +155,17 @@ class JansenRitModel(brainstate.nn.Dynamics):
 
     def __init__(
         self,
-        size: int,
+        in_size: brainstate.typing.Size,
         Ae: Union[brainstate.typing.ArrayLike, Callable] = 3.25 * u.mV,  # Excitatory gain
         Ai: Union[brainstate.typing.ArrayLike, Callable] = 22. * u.mV,  # Inhibitory gain
-        be: Union[brainstate.typing.ArrayLike, Callable] = 100. / u.second,  # Excit. time const
-        bi: Union[brainstate.typing.ArrayLike, Callable] = 50. / u.second,  # Inhib. time const.
+        be: Union[brainstate.typing.ArrayLike, Callable] = 100. * u.Hz,  # Excit. time const
+        bi: Union[brainstate.typing.ArrayLike, Callable] = 50. * u.Hz,  # Inhib. time const.
         C: Union[brainstate.typing.ArrayLike, Callable] = 135.,  # Connect. const.
         a1: Union[brainstate.typing.ArrayLike, Callable] = 1.,  # Connect. param.
         a2: Union[brainstate.typing.ArrayLike, Callable] = 0.8,  # Connect. param.
         a3: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param
         a4: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param.
-        s_max: Union[brainstate.typing.ArrayLike, Callable] = 5. / u.second,  # Max firing rate
+        s_max: Union[brainstate.typing.ArrayLike, Callable] = 2.5 * u.Hz,  # Max firing rate
         v0: Union[brainstate.typing.ArrayLike, Callable] = 6. * u.mV,  # Firing threshold
         r: Union[brainstate.typing.ArrayLike, Callable] = 0.56,  # Sigmoid steepness
         M_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
@@ -172,8 +175,11 @@ class JansenRitModel(brainstate.nn.Dynamics):
         Ev_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         Iv_init: Callable = brainstate.init.ZeroInit(unit=u.mV / u.second),
         fr_scale: Callable = Identity(),
+        noise_E: Noise = None,
+        noise_I: Noise = None,
+        noise_M: Noise = None,
     ):
-        super().__init__(size)
+        super().__init__(in_size)
 
         self.Ae = brainstate.init.param(Ae, self.varshape)
         self.Ai = brainstate.init.param(Ai, self.varshape)
@@ -202,6 +208,9 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.Ev_init = Ev_init
         self.Iv_init = Iv_init
         self.fr_scale = fr_scale
+        self.noise_E = noise_E
+        self.noise_I = noise_I
+        self.noise_M = noise_M
 
     def init_state(self, batch_size=None, **kwargs):
         self.M = brainstate.HiddenState(brainstate.init.param(self.M_init, self.varshape, batch_size))
@@ -220,19 +229,29 @@ class JansenRitModel(brainstate.nn.Dynamics):
         self.Iv.value = brainstate.init.param(self.Iv_init, self.varshape, batch_size)
 
     def S(self, v):
-        return self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
+        return 2. * self.s_max / (1 + u.math.exp(self.r * (self.v0 - v) / u.mV))
 
     def dMv(self, Mv, M, E, I, inp):
-        fr = self.S(self.a2 * E - self.a4 * I + inp)
+        fr = self.S(self.C * self.a2 * E - self.C * self.a4 * I + inp)
         return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Mv - self.be ** 2 * M
 
     def dEv(self, Ev, M, E, inp=0. * u.Hz):
-        fr = self.S(self.a1 * M) + inp
+        fr = self.S(self.C * self.a1 * M) + inp
         return self.Ae * self.be * self.fr_scale(fr) - 2 * self.be * Ev - self.be ** 2 * E
 
     def dIv(self, Iv, M, I, inp):
-        fr = self.S(self.a3 * M + inp)
+        fr = self.S(self.C * self.a3 * M + inp)
         return self.Ai * self.bi * self.fr_scale(fr) - 2 * self.bi * Iv - self.bi ** 2 * I
+
+    def derivative(self, state, t, M_inp, E_inp, I_inp):
+        M, E, I, Mv, Ev, Iv = state
+        dM = Mv
+        dE = Ev
+        dI = Iv
+        dMv = self.dMv(Mv, M, E, I, M_inp)
+        dEv = self.dEv(Ev, M, E, E_inp)
+        dIv = self.dIv(Iv, M, I, I_inp)
+        return (dM, dE, dI, dMv, dEv, dIv)
 
     def update(
         self,
@@ -240,13 +259,24 @@ class JansenRitModel(brainstate.nn.Dynamics):
         E_inp=0. * u.Hz,
         I_inp=0. * u.mV,
     ):
-        dt = brainstate.environ.get_dt()
-        M = self.M.value + self.Mv.value * dt
-        E = self.E.value + self.Ev.value * dt
-        I = self.I.value + self.Iv.value * dt
-        Mv = exp_euler_step(self.dMv, self.Mv.value, self.M.value, self.E.value, self.I.value, M_inp)
-        Ev = exp_euler_step(self.dEv, self.Ev.value, self.M.value, self.E.value, E_inp)
-        Iv = exp_euler_step(self.dIv, self.Iv.value, self.M.value, self.I.value, I_inp)
+        M_inp = M_inp if self.noise_M is None else M_inp + self.noise_M()
+        E_inp = E_inp if self.noise_E is None else E_inp + self.noise_E()
+        I_inp = I_inp if self.noise_I is None else I_inp + self.noise_I()
+        # dt = brainstate.environ.get_dt()
+        # M = self.M.value + self.Mv.value * dt
+        # E = self.E.value + self.Ev.value * dt
+        # I = self.I.value + self.Iv.value * dt
+        # Mv = exp_euler_step(self.dMv, self.Mv.value, self.M.value, self.E.value, self.I.value, M_inp)
+        # Ev = exp_euler_step(self.dEv, self.Ev.value, self.M.value, self.E.value, E_inp)
+        # Iv = exp_euler_step(self.dIv, self.Iv.value, self.M.value, self.I.value, I_inp)
+        M, E, I, Mv, Ev, Iv = braintools.quad.ode_rk4_step(
+            self.derivative,
+            (self.M.value, self.E.value, self.I.value, self.Mv.value, self.Ev.value, self.Iv.value),
+            0. * u.ms,
+            M_inp,
+            E_inp,
+            I_inp
+        )
         self.M.value = M
         self.E.value = E
         self.I.value = I
@@ -256,4 +286,4 @@ class JansenRitModel(brainstate.nn.Dynamics):
         return self.eeg()
 
     def eeg(self):
-        return self.a2 * self.E.value - self.a4 * self.I.value
+        return self.C * (self.a2 * self.E.value - self.a4 * self.I.value)

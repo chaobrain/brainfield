@@ -22,6 +22,7 @@ import jax.numpy as jnp
 import numpy as np
 
 __all__ = [
+    'Noise',
     'OUProcess',
     'GaussianNoise',
     'WhiteNoise',
@@ -33,7 +34,11 @@ __all__ = [
 ]
 
 
-class GaussianNoise(brainstate.nn.Dynamics):
+class Noise(brainstate.nn.Dynamics):
+    pass
+
+
+class GaussianNoise(Noise):
     """Gaussian (white) noise process without state (i.i.d. across time)."""
 
     def __init__(
@@ -57,7 +62,7 @@ class WhiteNoise(GaussianNoise):
     """Alias of GaussianNoise for semantic clarity."""
 
 
-class BrownianNoise(brainstate.nn.Dynamics):
+class BrownianNoise(Noise):
     """
     Brownian (red) noise: discrete-time integral of white noise.
 
@@ -93,7 +98,7 @@ class BrownianNoise(brainstate.nn.Dynamics):
         return self.mean + self.x.value
 
 
-class ColoredNoise(brainstate.nn.Dynamics):
+class ColoredNoise(Noise):
     """
     Colored noise with PSD ~ 1/f^beta generated via frequency-domain shaping.
 
@@ -172,7 +177,7 @@ class VioletNoise(ColoredNoise):
         super().__init__(in_size=in_size, beta=-2.0, mean=mean, sigma=sigma)
 
 
-class OUProcess(brainstate.nn.Dynamics):
+class OUProcess(Noise):
     r"""
     The Ornstein–Uhlenbeck process.
 

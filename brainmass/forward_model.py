@@ -291,6 +291,8 @@ class LeadFieldModel(brainstate.nn.Module):
         self.scale = scale
         if self.noise_cov is not None:
             assert u.get_unit(self.noise_cov).has_same_dim(self.sensor_unit ** 2)
+            cov = self.noise_cov.to_decimal(self.sensor_unit ** 2)  # (M,M) unitless magnitude of sensor_unit^2
+            self._noise_conv_Lc = jnp.linalg.cholesky(cov + 1e-32 * jnp.eye(cov.shape[0], dtype=cov.dtype))
         assert u.get_unit(self.L).has_same_dim(self.sensor_unit / self.dipole_unit)  # expected unit of L
 
     def _sample_noise(self, T: int) -> Quantity:
@@ -298,10 +300,8 @@ class LeadFieldModel(brainstate.nn.Module):
         Sample Gaussian sensor noise E (M,T) with covariance self._noise_cov_q per time step.
         Returns a Quantity in sensor_unit.
         """
-        cov = self.noise_cov.to_decimal(self.sensor_unit ** 2)  # (M,M) unitless magnitude of sensor_unit^2
-        Lc = jnp.linalg.cholesky(cov + 1e-32 * jnp.eye(cov.shape[0], dtype=cov.dtype))
         z = brainstate.random.randn(T, self.M)
-        e = Lc @ z  # (T,M) @ (M,M) -> (T,M)
+        e = z @ self._noise_conv_Lc  # (T,M) @ (M,M) -> (T,M)
         return e * self.sensor_unit
 
     # Inferred sizes

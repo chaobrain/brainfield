@@ -105,7 +105,7 @@ class ParamsJR():
             param = {
                 "A ": [3.25, 0], "a": [100, 0.], "B": [22, 0], "b": [50, 0], "g": [1000, 0], \
                 "c1": [135, 0.], "c2": [135 * 0.8, 0.], "c3 ": [135 * 0.25, 0.], "c4": [135 * 0.25, 0.], \
-                "std_in": [100, 0], "vmax": [5, 0], "v0": [6, 0], "r": [0.56, 0], "y0": [2, 0], \
+                "std_in": [100, 0], "vmax": [5, 0], "v0": [6, 0], "r": [0.56, 0], "M": [2, 0], \
                 "mu": [.5, 0], "k": [5, 0], "cy0": [5, 0], "ki": [1, 0]
             }
         for var in param:
@@ -123,7 +123,7 @@ class ParamsJR():
         self.c3= c3 # local gain from P to I
         self.c4= c4 # local gain from P to I
         self.mu = mu
-        self.y0 = y0
+        self.M = M
         self.std_in= std_in # local gain from P to I
         self.cy0 = cy0
         self.vmax = vmax

@@ -18,7 +18,7 @@ import brainunit as u
 import jax.numpy as jnp
 
 import brainstate
-from .noise import OUProcess
+from .noise import Noise
 
 __all__ = [
     'WongWangModel',
@@ -146,8 +146,8 @@ class WongWangModel(brainstate.nn.Dynamics):
         I_0: brainstate.typing.ArrayLike = 0.3255 * u.nA,  # background input current (nA)
 
         # Noise processes
-        noise_s1: OUProcess = None,
-        noise_s2: OUProcess = None,
+        noise_s1: Noise = None,
+        noise_s2: Noise = None,
     ):
         super().__init__(in_size=in_size)
 

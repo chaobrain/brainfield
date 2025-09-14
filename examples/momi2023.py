@@ -30,6 +30,7 @@ import pickle
 from pathlib import Path
 from typing import Union, Callable
 
+import jax
 import brainstate
 import brainunit as u
 import jax.numpy as jnp
@@ -87,7 +88,7 @@ class JansenRitNetwork(brainstate.nn.Module):
 
     This model is a modified version of the original Jansen-Rit model, incorporating additional
     parameters and dynamics to better capture the behavior of neural populations. The modifications
-    include the addition of parameters such as `mu`, `k`, `y0`, `cy0`, and `ki`, which influence
+    include the addition of parameters such as `mu`, `k`, `M`, `cy0`, and `ki`, which influence
     the dynamics of the system.
 
     The equations governing the modified Jansen-Rit model are as follows:
@@ -99,7 +100,7 @@ class JansenRitNetwork(brainstate.nn.Module):
     & \dot{y_4}=y_5,\\
     &\dot{y}_{1}=A_eb_eS(I_p+a_2y_2-a_4y_4)-2b_ey_1-b_e^2y_0,\\
     &\dot{y}_{3}=A_eb_eS(a_1y_0)-2b_ey_3-b_e^2y_2,\\
-    &\ddot{y}_{5}=A_ib_iS(I_i+a_3y_0)-2b_iy_5-b_i^2y_4 + \mu k S(y0 - cy0) - ki y5.
+    &\ddot{y}_{5}=A_ib_iS(I_i+a_3y_0)-2b_iy_5-b_i^2y_4 + \mu k S(M - cy0) - ki Iv.
     \end{aligned}
     $$
 
@@ -112,10 +113,10 @@ class JansenRitNetwork(brainstate.nn.Module):
     The additional parameters introduced in this modified model are defined as follows:
 
     - `mu`: A scaling factor that modulates the influence of the additional term in the equation for $\ddot{y}_{5}$.
-    - `k`: A parameter that scales the sigmoid function applied to the difference between `y0` and `cy0`.
-    - `y0`: A reference potential that influences the dynamics of the inhibitory population.
-    - `cy0`: A constant that shifts the reference potential `y0`.
-    - `ki`: A damping factor that affects the rate of change of `y5`.
+    - `k`: A parameter that scales the sigmoid function applied to the difference between `M` and `cy0`.
+    - `M`: A reference potential that influences the dynamics of the inhibitory population.
+    - `cy0`: A constant that shifts the reference potential `M`.
+    - `ki`: A damping factor that affects the rate of change of `Iv`.
 
     """
 
@@ -237,13 +238,13 @@ class JansenRitNetwork(brainstate.nn.Module):
         dt = brainstate.environ.get_dt() / u.second
         relu = u.math.relu
 
-        g = relu(maybe_state(self.g))
-        std_in = relu(maybe_state(self.std_in))
         lb = maybe_state(self.lb)
-        c1 = relu(maybe_state(self.c1))
-        c2 = relu(maybe_state(self.c2))
-        c3 = relu(maybe_state(self.c3))
-        c4 = relu(maybe_state(self.c4))
+        g = relu(maybe_state(self.g)) + lb
+        std_in = relu(maybe_state(self.std_in))
+        c1 = relu(maybe_state(self.c1)) + lb
+        c2 = relu(maybe_state(self.c2)) + lb
+        c3 = relu(maybe_state(self.c3)) + lb
+        c4 = relu(maybe_state(self.c4)) + lb
         k = relu(maybe_state(self.k))
         B = relu(maybe_state(self.B))
         b = relu(maybe_state(self.b)) + 1.0
@@ -252,10 +253,11 @@ class JansenRitNetwork(brainstate.nn.Module):
         mu = relu(maybe_state(self.mu))
 
         w_n = self.effective_sc()
-        dg = -jnp.diag(jnp.sum(w_n, axis=1))
+        dg = -jnp.sum(w_n, axis=1)
 
         scaleI = Scale(self.u_2ndsys_ub)
-        lm_t = self.lm - 1 / self.output_size * jnp.matmul(jnp.ones((1, self.output_size)), self.lm)
+        # scaleI = lambda x: x
+        lm_t = self.lm - u.math.matmul(jnp.ones((1, self.output_size)), self.lm) / self.output_size
         delay_step = jnp.asarray(self.dist / (self.conduct_lb + mu), dtype=np.int32)
 
         def one_time(input_one_time):
@@ -270,18 +272,23 @@ class JansenRitNetwork(brainstate.nn.Module):
             # firing rate for Excitatory population
             noiseE = brainstate.random.randn(self.hidden_size)
             rE = ((self.noise_std_lb + std_in) * noiseE +
-                  (lb + g) * (LEd + jnp.matmul(dg, self.E.value)) +
-                  (lb + c2) * self.S((lb + c1) * self.M.value))
+                  g * (LEd + dg * self.E.value) +
+                  (self.k_lb + k) * self.ki * input_one_time +
+                  c2 * self.S(c1 * self.M.value))
             # firing rate for Inhibitory population
-            rI = (lb + c4) * self.S((lb + c3) * self.M.value)
+            rI = c4 * self.S(c3 * self.M.value)
+
+            # jax.debug.print('rM = {rM}, rE = {rE}, rI = {rI}',
+            #                 rM=u.math.max(u.math.abs(rM)),
+            #                 rE=u.math.max(u.math.abs(rE)),
+            #                 rI=u.math.max(u.math.abs(rI)),)
 
             # Update the states by step-size.
             ddM = self.M.value + dt * self.Mv.value
             ddE = self.E.value + dt * self.Ev.value
             ddI = self.I.value + dt * self.Iv.value
             ddMv = self.Mv.value + dt * self.sys2nd(A, a, scaleI(rM), self.M.value, self.Mv.value)
-            ccc = scaleI(rE) + (self.k_lb + k) * self.ki * input_one_time
-            ddEv = self.Ev.value + dt * self.sys2nd(A, a, ccc, self.E.value, self.Ev.value)
+            ddEv = self.Ev.value + dt * self.sys2nd(A, a, scaleI(rE), self.E.value, self.Ev.value)
             ddIv = self.Iv.value + dt * self.sys2nd(B, b, scaleI(rI), self.I.value, self.Iv.value)
 
             # Calculate the saturation for model states (for stability and gradient calculation).
@@ -294,6 +301,7 @@ class JansenRitNetwork(brainstate.nn.Module):
 
             # update placeholders for E buffer
             # self.delay.value = self.delay.value.at[0].set(self.E.value)
+            # self.delay.value = jnp.concatenate((jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0)
 
         def one_duration(input_one_batch):
             # input_one_batch: [n_time, n_input]
