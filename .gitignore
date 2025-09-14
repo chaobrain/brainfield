@@ -227,3 +227,4 @@ cython_debug/
 /docs/apis/deprecated/generated/
 /.claude/
 /CLAUDE.md
+/dev/

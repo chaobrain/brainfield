@@ -16,14 +16,14 @@
 from typing import Optional, Union, Callable
 
 import brainstate
-import braintools
 import brainunit as u
 import jax
 import jax.numpy as jnp
 
+import braintools
+
 Array = jax.Array
 Quantity = u.Quantity
-UnitLike = u.Unit
 
 __all__ = [
     'BOLDSignal',
@@ -248,11 +248,11 @@ class LeadFieldModel(brainstate.nn.Module):
 
         - A `brainunit.Quantity` with unit **sensor_unit / dipole_unit** and shape ``(R, M)``; or
         - A unitless ``(R, M)`` array, in which case `leadfield_unit` must be provided.
-    sensor_unit : Quantity, optional
+    sensor_unit : Unit, optional
         Unit of the sensor signals, e.g. ``"V"`` for EEG or ``"T"`` for MEG.
-    dipole_unit : Quantity, optional
+    dipole_unit : Unit, optional
         Unit of dipole moment (ECD), typically ``"nA*m"``.
-    scale : Quantity, float, optional
+    scale : Quantity, Unit, float, optional
         Optional mapping from the **NMM observable** to **dipole moment**.
         This can be:
 
@@ -272,8 +272,8 @@ class LeadFieldModel(brainstate.nn.Module):
         in_size,
         out_size,
         L: Union[Array, Quantity, Callable],
-        sensor_unit: UnitLike = u.mV,  # "V" for EEG, "T" for MEG
-        dipole_unit: UnitLike = u.nA * u.meter,  # ECD unit
+        sensor_unit: u.Unit = u.mV,  # "V" for EEG, "T" for MEG
+        dipole_unit: u.Unit = u.nA * u.meter,  # ECD unit
         scale: Optional[Union[float, Quantity]] = None,
         noise_cov: Optional[Union[Array, Quantity]] = None,
     ):
@@ -290,10 +290,10 @@ class LeadFieldModel(brainstate.nn.Module):
             scale = dipole_unit / sensor_unit
         self.scale = scale
         if self.noise_cov is not None:
-            assert u.get_unit(self.noise_cov).has_same_dim(self.sensor_unit ** 2)
+            u.fail_for_dimension_mismatch(self.noise_cov, self.sensor_unit ** 2)
             cov = self.noise_cov.to_decimal(self.sensor_unit ** 2)  # (M,M) unitless magnitude of sensor_unit^2
             self._noise_conv_Lc = jnp.linalg.cholesky(cov + 1e-32 * jnp.eye(cov.shape[0], dtype=cov.dtype))
-        assert u.get_unit(self.L).has_same_dim(self.sensor_unit / self.dipole_unit)  # expected unit of L
+        u.fail_for_dimension_mismatch(self.L, self.sensor_unit / self.dipole_unit)  # expected unit of L
 
     def _sample_noise(self, T: int) -> Quantity:
         """
@@ -449,13 +449,14 @@ class EEGLeadFieldModel(LeadFieldModel):
         in_size,
         out_size,
         L: Union[Array, Quantity, Callable],
+        sensor_unit: u.Unit = u.mV,
         noise_cov: Optional[Union[Array, Quantity]] = None,
     ):
         super().__init__(
             in_size,
             out_size,
             L=L,
-            sensor_unit=u.mV,
+            sensor_unit=sensor_unit,
             dipole_unit=u.nA * u.meter,
             scale=u.nA * u.meter / u.mV,
             noise_cov=noise_cov,
@@ -468,13 +469,14 @@ class MEGLeadFieldModel(LeadFieldModel):
         in_size,
         out_size,
         L: Union[Array, Quantity, Callable],
+        sensor_unit: u.Unit = u.tesla,
         noise_cov: Optional[Union[Array, Quantity]] = None,
     ):
         super().__init__(
             in_size,
             out_size,
             L=L,
-            sensor_unit=u.tesla,
+            sensor_unit=sensor_unit,
             dipole_unit=u.nA * u.meter,
             scale=u.nA * u.meter / u.tesla,
             noise_cov=noise_cov,

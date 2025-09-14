@@ -26,24 +26,21 @@
 # 
 # and replate the path in the ``reproduce_Momi_et_al_2022/leadfield_from_mne`` directory.
 # %%
+import functools
 import pickle
 from pathlib import Path
-from typing import Union, Callable
+from typing import Callable
 
-import jax
 import brainstate
 import brainunit as u
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import scipy
-from brainstate import maybe_state
 from sklearn.metrics.pairwise import cosine_similarity
 
-
-# %%
-class Parameter(brainstate.ParamState, u.CustomArray):
-    pass
+import brainmass
+import braintools
 
 
 # %%
@@ -82,250 +79,136 @@ class Scale:
         return u.maybe_decimal(self.slope * self.fn(x / self.slope) * unit)
 
 
-class JansenRitNetwork(brainstate.nn.Module):
-    r"""
-    Network with Jansen-Rit neural mass models.
+# %%
+class Parameter(brainstate.ParamState, u.CustomArray):
+    def __init__(
+        self,
+        value,
+        transform: braintools.Transform = braintools.IdentityTransform()
+    ):
+        value = transform.inverse(value)
+        super().__init__(value)
+        self.transform = transform
 
-    This model is a modified version of the original Jansen-Rit model, incorporating additional
-    parameters and dynamics to better capture the behavior of neural populations. The modifications
-    include the addition of parameters such as `mu`, `k`, `M`, `cy0`, and `ki`, which influence
-    the dynamics of the system.
+    @property
+    def data(self):
+        return self.transform(self.value)
 
-    The equations governing the modified Jansen-Rit model are as follows:
+    # @data.setter
+    # def data(self, v):
+    #     self.value = self.transform.inverse(v)
 
-    $$
-    \begin{aligned}
-    & \dot{y}_{0}=y_1,\\
-    & \dot{y_2}=y_3,\\
-    & \dot{y_4}=y_5,\\
-    &\dot{y}_{1}=A_eb_eS(I_p+a_2y_2-a_4y_4)-2b_ey_1-b_e^2y_0,\\
-    &\dot{y}_{3}=A_eb_eS(a_1y_0)-2b_ey_3-b_e^2y_2,\\
-    &\ddot{y}_{5}=A_ib_iS(I_i+a_3y_0)-2b_iy_5-b_i^2y_4 + \mu k S(M - cy0) - ki Iv.
-    \end{aligned}
-    $$
 
-    The sigmoid function $S(v)$ remains unchanged from the original Jansen-Rit model:
-
-    $$
-    S(v)=S_{\max } \cdot \frac{1}{1+e^{-r\left(v-v_0\right)}}
-    $$
-
-    The additional parameters introduced in this modified model are defined as follows:
-
-    - `mu`: A scaling factor that modulates the influence of the additional term in the equation for $\ddot{y}_{5}$.
-    - `k`: A parameter that scales the sigmoid function applied to the difference between `M` and `cy0`.
-    - `M`: A reference potential that influences the dynamics of the inhibitory population.
-    - `cy0`: A constant that shifts the reference potential `M`.
-    - `ki`: A damping factor that affects the rate of change of `Iv`.
-
-    """
-
+# %%
+class Network(brainstate.nn.Module):
     def __init__(
         self,
         sc: np.ndarray,
-        lm: np.ndarray,
         dist: np.ndarray,
-        w_bb: np.ndarray,
+        lm: u.Quantity,
+        w_bb: brainstate.typing.ArrayLike,
+        gc=1e3,
 
-        # parameters
-        A: Union[brainstate.typing.ArrayLike, Callable] = 3.25,
-        a: Union[brainstate.typing.ArrayLike, Callable] = 100.0,
-        B: Union[brainstate.typing.ArrayLike, Callable] = 22.0,
-        b: Union[brainstate.typing.ArrayLike, Callable] = 50.0,
-        g: Union[brainstate.typing.ArrayLike, Callable] = 1000.0,
-        c1: Union[brainstate.typing.ArrayLike, Callable] = 135.0,
-        c2: Union[brainstate.typing.ArrayLike, Callable] = 135 * 0.8,
-        c3: Union[brainstate.typing.ArrayLike, Callable] = 135 * 0.25,
-        c4: Union[brainstate.typing.ArrayLike, Callable] = 135 * 0.25,
-        std_in: Union[brainstate.typing.ArrayLike, Callable] = 100.0,
-        vmax: Union[brainstate.typing.ArrayLike, Callable] = 5.0,
-        v0: Union[brainstate.typing.ArrayLike, Callable] = 6.0,
-        r: Union[brainstate.typing.ArrayLike, Callable] = 0.56,
-        y0: Union[brainstate.typing.ArrayLike, Callable] = 2.0,
-        mu: Union[brainstate.typing.ArrayLike, Callable] = 1.0,
-        k: Union[brainstate.typing.ArrayLike, Callable] = 10.0,
-        cy0: Union[brainstate.typing.ArrayLike, Callable] = 5.0,
-        ki: Union[brainstate.typing.ArrayLike, Callable] = 1.0,
-
-        # constants
-        lb: float = 0.01,  # lower bound of local gains
-        k_lb: float = 0.5,  # lower bound of coefficient of external inputs
-        s2o_coef=0.0001,  # coefficient from states (source EEG) to EEG
+        # node parameters
+        Ae=3.25 * u.mV,  # Excitatory gain
+        Ai=22. * u.mV,  # Inhibitory gain
+        be=100. / u.second,  # Excit. time const
+        bi=50. / u.second,  # Inhib. time const.
+        C=135.,  # Connect. const.
+        a1=1.,  # Connect. param.
+        a2=0.8,  # Connect. param.
+        a3=0.25,  # Connect. param
+        a4=0.25,  # Connect. param.
+        s_max=5. * u.Hz,  # Max firing rate
+        v0=6. * u.mV,  # Firing threshold
+        r=0.56,
+        std_in=150. * u.Hz,
+        var_init: Callable = brainstate.init.Uniform(0., 5.0, unit=u.mV),
+        mom_init: Callable = brainstate.init.Uniform(0., 5.0, unit=u.mV / u.second),
         conduct_lb: float = 1.5,  # lower bound for conduct velocity
-        u_2ndsys_ub: float = 500.,  # the bound of the input for second order system
-        noise_std_lb: float = 150.0,  # lower bound of std of noise
-
-        # initializers
-        hidden_init: Callable = brainstate.init.Uniform(0., 5.0),
-        delay_init: Callable = brainstate.init.Uniform(0., 5.0),
     ):
         super().__init__()
 
+        self.w_bb = w_bb
+        self.sc = sc
+        self.gc = gc
+
         self.hidden_size = sc.shape[0]
-        self.output_size = lm.shape[0]
-        assert sc.shape == dist.shape
-        assert lm.shape[1] == dist.shape[0] == dist.shape[1]
-        self.hidden_init = hidden_init
-        self.delay_init = delay_init
+        self.output_size = lm.shape[1]
+        delay_time = dist / conduct_lb * brainstate.environ.get_dt()
+        delay_indices = np.expand_dims(np.arange(self.hidden_size), axis=0)
+        delay_indices = np.tile(delay_indices, (self.hidden_size, 1))
 
-        self.sc = sc  # [hidden_size, hidden_size]
-        self.lm = lm  # [output_size, hidden_size]
-        self.dist = dist  # [hidden_size, hidden_size]
-        self.w_bb = w_bb  # [hidden_size, hidden_size]
-
-        self.A = brainstate.init.param(A, self.hidden_size)
-        self.a = brainstate.init.param(a, self.hidden_size)
-        self.B = brainstate.init.param(B, self.hidden_size)
-        self.b = brainstate.init.param(b, self.hidden_size)
-        self.g = brainstate.init.param(g, self.hidden_size)
-        self.c1 = brainstate.init.param(c1, self.hidden_size)
-        self.c2 = brainstate.init.param(c2, self.hidden_size)
-        self.c3 = brainstate.init.param(c3, self.hidden_size)
-        self.c4 = brainstate.init.param(c4, self.hidden_size)
-        self.std_in = brainstate.init.param(std_in, self.hidden_size)
-        self.vmax = brainstate.init.param(vmax, self.hidden_size)
-        self.v0 = brainstate.init.param(v0, self.hidden_size)
-        self.r = brainstate.init.param(r, self.hidden_size)
-        self.mu = brainstate.init.param(mu, self.hidden_size)
-        self.k = brainstate.init.param(k, self.hidden_size)
-        self.cy0 = brainstate.init.param(cy0, self.hidden_size)
-        self.ki = brainstate.init.param(ki, self.hidden_size)
-
-        self.y0 = brainstate.init.param(y0, self.output_size)
-
-        self.lb = brainstate.init.param(lb, self.hidden_size)
-        self.k_lb = brainstate.init.param(k_lb, self.hidden_size)
-        self.s2o_coef = brainstate.init.param(s2o_coef, self.hidden_size)
-        self.conduct_lb = brainstate.init.param(conduct_lb, self.hidden_size)
-        self.u_2ndsys_ub = brainstate.init.param(u_2ndsys_ub, self.hidden_size)
-        self.noise_std_lb = brainstate.init.param(noise_std_lb, self.hidden_size)
-
-    def init_state(self, batch_size=None, **kwargs):
-        size = (self.hidden_size,) if batch_size is None else (batch_size, self.hidden_size)
-        self.M = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.E = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.I = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.Mv = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.Ev = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.Iv = brainstate.HiddenState(brainstate.init.param(self.hidden_init, size))
-        self.delay = brainstate.HiddenState(brainstate.init.param(self.delay_init, (500,) + size))
-
-    def reset_state(self, batch_size=None, **kwargs):
-        size = self.hidden_size if batch_size is None else (batch_size, *self.hidden_size)
-        self.M.value = brainstate.init.param(self.hidden_init, size)
-        self.E.value = brainstate.init.param(self.hidden_init, size)
-        self.I.value = brainstate.init.param(self.hidden_init, size)
-        self.Mv.value = brainstate.init.param(self.hidden_init, size)
-        self.Ev.value = brainstate.init.param(self.hidden_init, size)
-        self.Iv.value = brainstate.init.param(self.hidden_init, size)
-        self.delay.value = brainstate.init.param(self.delay_init, (500,) + size)
-
-    def sys2nd(self, A, a, u, x, v):
-        return A * a * u - 2 * a * v - a ** 2 * x
-
-    def S(self, v):
-        return maybe_state(self.vmax) / (1 + u.math.exp(maybe_state(self.r) * (maybe_state(self.v0) - v)))
+        self.node = brainmass.JansenRitModel(
+            in_size=sc.shape[0],
+            Ae=Ae,
+            Ai=Ai,
+            be=be,
+            bi=bi,
+            C=C,
+            a1=a1,
+            a2=a2,
+            a3=a3,
+            a4=a4,
+            s_max=s_max,
+            v0=v0,
+            r=r,
+            M_init=var_init,
+            E_init=var_init,
+            I_init=var_init,
+            Mv_init=mom_init,
+            Ev_init=mom_init,
+            Iv_init=mom_init,
+            noise_E=brainmass.GaussianNoise(sc.shape[0], sigma=std_in),
+            fr_scale=Scale(5e2),
+        )
+        self.delay_E = brainstate.nn.StateWithDelay(self.node, 'E', init=var_init)
+        self.delay_E.register_entry('d', delay_time, delay_indices)
+        self.lm = brainmass.EEGLeadFieldModel(self.sc.shape[0], lm.shape[-1], L=lm)
 
     def effective_sc(self):
-        w = u.math.exp(maybe_state(self.w_bb)) * maybe_state(self.sc)
+        w = u.math.exp(self.w_bb) * self.sc
         w2 = u.math.log1p((w + w.T) / 2)
         w_n = w2 / u.math.linalg.norm(w2)
         return w_n
 
-    def update(self, inputs):
-        # input: [n_duration, n_time, n_input]
+    def update(self, conn, E_delayed_inp, E_inp):
+        E_inp = E_inp + E_delayed_inp - self.gc * self.node.E.value * u.math.sum(conn, axis=1)
+        self.node(E_inp=E_inp)
 
-        dt = brainstate.environ.get_dt() / u.second
-        relu = u.math.relu
-
-        lb = maybe_state(self.lb)
-        g = relu(maybe_state(self.g)) + lb
-        std_in = relu(maybe_state(self.std_in))
-        c1 = relu(maybe_state(self.c1)) + lb
-        c2 = relu(maybe_state(self.c2)) + lb
-        c3 = relu(maybe_state(self.c3)) + lb
-        c4 = relu(maybe_state(self.c4)) + lb
-        k = relu(maybe_state(self.k))
-        B = relu(maybe_state(self.B))
-        b = relu(maybe_state(self.b)) + 1.0
-        A = relu(maybe_state(self.A))
-        a = relu(maybe_state(self.a)) + 1.0
-        mu = relu(maybe_state(self.mu))
-
-        w_n = self.effective_sc()
-        dg = -jnp.sum(w_n, axis=1)
-
-        scaleI = Scale(self.u_2ndsys_ub)
-        # scaleI = lambda x: x
-        lm_t = self.lm - u.math.matmul(jnp.ones((1, self.output_size)), self.lm) / self.output_size
-        delay_step = jnp.asarray(self.dist / (self.conduct_lb + mu), dtype=np.int32)
-
-        def one_time(input_one_time):
-            # delayed E
-            Ed = u.math.gather(self.delay.value, 0, delay_step)
-
-            # weights on delayed E
-            LEd = jnp.sum(w_n * Ed, axis=1)
-
-            # firing rate for Main population
-            rM = self.S(self.E.value - self.I.value)
-            # firing rate for Excitatory population
-            noiseE = brainstate.random.randn(self.hidden_size)
-            rE = ((self.noise_std_lb + std_in) * noiseE +
-                  g * (LEd + dg * self.E.value) +
-                  (self.k_lb + k) * self.ki * input_one_time +
-                  c2 * self.S(c1 * self.M.value))
-            # firing rate for Inhibitory population
-            rI = c4 * self.S(c3 * self.M.value)
-
-            # jax.debug.print('rM = {rM}, rE = {rE}, rI = {rI}',
-            #                 rM=u.math.max(u.math.abs(rM)),
-            #                 rE=u.math.max(u.math.abs(rE)),
-            #                 rI=u.math.max(u.math.abs(rI)),)
-
-            # Update the states by step-size.
-            ddM = self.M.value + dt * self.Mv.value
-            ddE = self.E.value + dt * self.Ev.value
-            ddI = self.I.value + dt * self.Iv.value
-            ddMv = self.Mv.value + dt * self.sys2nd(A, a, scaleI(rM), self.M.value, self.Mv.value)
-            ddEv = self.Ev.value + dt * self.sys2nd(A, a, scaleI(rE), self.E.value, self.Ev.value)
-            ddIv = self.Iv.value + dt * self.sys2nd(B, b, scaleI(rI), self.I.value, self.Iv.value)
-
-            # Calculate the saturation for model states (for stability and gradient calculation).
-            self.E.value = ddE
-            self.I.value = ddI
-            self.M.value = ddM
-            self.Ev.value = ddEv
-            self.Iv.value = ddIv
-            self.Mv.value = ddMv
-
-            # update placeholders for E buffer
-            # self.delay.value = self.delay.value.at[0].set(self.E.value)
-            # self.delay.value = jnp.concatenate((jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0)
-
-        def one_duration(input_one_batch):
-            # input_one_batch: [n_time, n_input]
-            brainstate.transform.for_loop(one_time, input_one_batch)
-            self.delay.value = jnp.concatenate((jnp.expand_dims(self.E.value, axis=0), self.delay.value[:-1]), axis=0)
-            eeg_ = self.s2o_coef * self.cy0 * jnp.matmul(lm_t, self.E.value - self.I.value) - self.y0
+    def update_duration(self, E_inp_duration, index):
+        # E_inp_duration: [n_time_per_duration, n_feature]
+        # index : int
+        with brainstate.environ.context(i=index):
+            conn = self.effective_sc() * u.Hz / u.mV
+            E_delayed_inp = brainmass.additive_coupling(self.delay_E.at('d'), conn, self.gc)
+            brainstate.transform.for_loop(functools.partial(self.update, conn, E_delayed_inp), E_inp_duration)
+            self.delay_E.update(self.node.E.value)
+            eeg = self.lm(self.node.eeg())
             return {
-                'M': self.M.value,
-                'I': self.I.value,
-                'E': self.E.value,
-                'Mv': self.Mv.value,
-                'Ev': self.Ev.value,
-                'Iv': self.Iv.value,
-                'eeg': eeg_,
+                'M': self.node.M.value,
+                'I': self.node.I.value,
+                'E': self.node.E.value,
+                'Mv': self.node.Mv.value,
+                'Ev': self.node.Ev.value,
+                'Iv': self.node.Iv.value,
+                'eeg': eeg,
             }
 
-        return brainstate.transform.for_loop(one_duration, inputs)
+    def update_batch(self, i_duration_start, E_inp_batch):
+        # E_inp_batch: [n_duration, n_time_per_duration, n_feature]
+        return brainstate.transform.for_loop(
+            self.update_duration,
+            E_inp_batch,
+            i_duration_start + np.arange(E_inp_batch.shape[0])
+        )
 
 
 # %%
 class ModelFitting:
     def __init__(
         self,
-        model: JansenRitNetwork,
+        model: Network,
         optimizer: brainstate.optim.Optimizer,
         duration_per_batch: u.Quantity,
         time_per_duration: u.Quantity,
@@ -343,13 +226,13 @@ class ModelFitting:
         self.grad_clip = grad_clip
 
     @brainstate.transform.jit(static_argnums=0)
-    def _batch_train(self, inputs, targets):
+    def _batch_train(self, i_duration, inputs, targets):
         # inputs: [n_duration, n_time_per_duration, n_input]
         # targets: [n_duration, n_time_per_duration, n_output]
 
         def f_loss():
-            out = self.model(inputs)
-            loss_ = 10. * self.cost(out['eeg'], targets)
+            out = self.model.update_batch(i_duration, inputs)
+            loss_ = self.cost(out['eeg'], targets)
             return loss_, out
 
         f_grad = brainstate.transform.grad(f_loss, grad_states=self.weights, return_value=True, has_aux=True)
@@ -361,8 +244,8 @@ class ModelFitting:
 
     def train(
         self,
-        data: np.ndarray,
-        uuu: np.ndarray,
+        data: u.Quantity,
+        uuu: u.Quantity,
         n_epoch: int,
         epoch_min: int = 10,  # run minimum epoch # part of stop criteria
         r_lb: float = 0.85,  # lowest pearson correlation # part of stop criteria
@@ -372,9 +255,9 @@ class ModelFitting:
         
         Parameters
         ---------- 
-        data: np.ndarray
+        data: ArrayLike
             Empirical data [n_time, n_channels]
-        uuu: np.ndarray
+        uuu: ArrayLike
             Input stimulation [n_time, n_nodes]
         n_epoch: int
             Number of training epochs
@@ -393,15 +276,15 @@ class ModelFitting:
         output = JansenRitOutput()
 
         duration = self.n_duration_per_batch
-        num_durations = int(data.shape[0] / duration)
+        num_batches = int(data.shape[0] / duration)
 
         for i_epoch in range(n_epoch):
             losses = []
             output_eeg = []
-            for i_duration in range(num_durations):
-                inputs = uuu[i_duration * duration:(i_duration + 1) * duration]
-                targets = data[i_duration * duration:(i_duration + 1) * duration]
-                loss, out_batch = self._batch_train(inputs, targets)
+            for i_batch in range(num_batches):
+                inputs = uuu[i_batch * duration:(i_batch + 1) * duration]
+                targets = data[i_batch * duration:(i_batch + 1) * duration]
+                loss, out_batch = self._batch_train(i_batch, inputs, targets)
                 output.M.append(out_batch['M'])
                 output.E.append(out_batch['E'])
                 output.I.append(out_batch['I'])
@@ -413,11 +296,11 @@ class ModelFitting:
                 losses.append(loss)
 
             # Calculate metrics like model_fit_LM.py
-            fc = np.corrcoef(data.T)
-            ts_sim = np.concatenate(output_eeg, axis=0)
+            fc = np.corrcoef(u.get_mantissa(data.T))
+            ts_sim = u.get_magnitude(u.math.concatenate(output_eeg, axis=0))
             fc_sim = np.corrcoef(ts_sim[10:].T)  # Skip first 10 timepoints
-            corr = np.corrcoef(fc_sim[mask_e], fc[mask_e])[0, 1]
-            cos_sim = np.diag(cosine_similarity(ts_sim.T, data.T)).mean()
+            corr = u.math.corrcoef(fc_sim[mask_e], fc[mask_e])[0, 1]
+            cos_sim = u.math.diag(cosine_similarity(ts_sim.T, u.get_magnitude(data.T))).mean()
 
             print(
                 f'epoch {i_epoch}, '
@@ -425,19 +308,18 @@ class ModelFitting:
                 f'pearson correlation = {corr}, '
                 f'cosine similarity = {cos_sim}'
             )
-
             if i_epoch > epoch_min and corr > r_lb:
                 break
         return output
 
     @brainstate.transform.jit(static_argnums=0)
-    def _batch_predict(self, inputs):
+    def _batch_predict(self, i_duration, inputs):
         # inputs: [n_duration, n_time, n_input]
-        return self.model(inputs)
+        return self.model.update_batch(i_duration, inputs)
 
     def test(
         self,
-        uuu: np.ndarray,
+        uuu: u.Quantity,
         base_batch_num: int = 20,
         data: np.ndarray = None,
     ) -> JansenRitOutput:
@@ -446,11 +328,11 @@ class ModelFitting:
         
         Parameters
         ----------
-        uuu: np.ndarray  
+        uuu: ArrayLike
             Input stimulation [n_time, n_nodes]
         base_batch_num: int
             Number of baseline batches before actual data (like warmup)
-        data: np.ndarray
+        data: ArrayLike
             Empirical data [n_time, n_channels]
         """
         duration = self.n_duration_per_batch
@@ -464,7 +346,7 @@ class ModelFitting:
         # Create extended input like model_fit_LM.py:
         # u_hat has extra baseline batches + actual data
         total_time_steps = base_batch_num * duration + uuu.shape[0]
-        u_hat = np.zeros((total_time_steps, *uuu.shape[1:]))
+        u_hat = np.zeros((total_time_steps, *uuu.shape[1:])) * uuu.unit
         u_hat[base_batch_num * duration:] = uuu  # Put actual input after baseline
 
         # Calculate total number of batches (baseline + actual)
@@ -479,7 +361,7 @@ class ModelFitting:
             batch_input = u_hat[start_idx:end_idx]
 
             # Run model prediction (no gradients needed for test)
-            out_batch = self._batch_predict(batch_input)
+            out_batch = self._batch_predict(start_idx, batch_input)
 
             # Only collect outputs after baseline batches (like model_fit_LM.py)
             if i_batch >= base_batch_num:
@@ -493,13 +375,13 @@ class ModelFitting:
 
         # Compute correlation metrics like model_fit_LM.py
         if data is not None:
-            ts_sim = np.concatenate(output.eeg, axis=0)
+            ts_sim = u.get_magnitude(u.math.concatenate(output.eeg, axis=0))
             fc_sim = np.corrcoef(ts_sim[transient_num:].T)  # Skip transients
-            fc_emp = np.corrcoef(data.T)
+            fc_emp = np.corrcoef(u.get_mantissa(data.T))
 
             mask_e = np.tril_indices(self.model.output_size, -1)
             corr = np.corrcoef(fc_sim[mask_e], fc_emp[mask_e])[0, 1]
-            cos_sim = np.diag(cosine_similarity(ts_sim.T, data.T)).mean()
+            cos_sim = np.diag(cosine_similarity(ts_sim.T, u.get_magnitude(data.T))).mean()
             print(f'Test - Pearson correlation: {corr:.3f}, Cosine similarity: {cos_sim:.3f}')
 
         return output
@@ -508,7 +390,7 @@ class ModelFitting:
 # %%
 class DistCost:
     def __call__(self, sim, emp):
-        return jnp.sqrt(jnp.mean((sim - emp) ** 2))
+        return u.get_mantissa(u.math.sqrt(u.math.mean((sim - emp) ** 2)))
 
 
 # %%
@@ -558,13 +440,12 @@ stim_weights.shape
 # %%
 node_size = stim_weights.shape[0]
 output_size = lm.shape[0]
-batch_size = 50
-input_size = 3
+n_duration_per_batch = 50
 num_epoches = 120
-tr = 0.001 * u.second
+duration_length = 0.001 * u.second
 step_size = 0.0001 * u.second
-n_time_per_duration = int(tr / step_size)
-lm_v = np.zeros((output_size, node_size))
+n_time_per_duration = int(duration_length / step_size)
+
 # %%
 brainstate.environ.set(dt=step_size)
 
@@ -572,71 +453,70 @@ brainstate.environ.set(dt=step_size)
 # %%
 def train_one_subject(sub_index):
     print(f'sub: {sub_index}')
-    data_mean = np.array(data_high['only_high_trial'][sub_index]).T
+    data_mean = np.array(data_high['only_high_trial'][sub_index]).T * u.mV
     # data_mean: [2000, n_channel]
     # data_mean: [2000, 62]
 
     lm = np.load(f'{files_dir}/leadfield_from_mne/sub{str(sub_index + 1).zfill(3)}/leadfield.npy', allow_pickle=True)
-    # Initialize parameters to match model_fit_LM.py initialization strategy
-    net = JansenRitNetwork(
+    lm = lm - u.math.mean(lm, axis=0, keepdims=True)
+
+    net = Network(
         sc=sc,
-        lm=lm + lm_v,  # Use base leadfield matrix
-        w_bb=Parameter(sc + 0.05 * np.ones_like(sc)),  # Initialize w_bb similar to model_fit_LM.py
+        lm=lm.T * u.mV / (u.nA * u.meter),  # Use base leadfield matrix
+        w_bb=Parameter(sc + 0.05),
         dist=dist,
-        A=Parameter(3.25 + np.random.randn() * 0.1),  # Add small random noise
-        a=Parameter(100. + np.random.randn() * 2.0),  # Match model_fit_LM.py variance
-        B=Parameter(22. + np.random.randn() * 0.1),
-        b=Parameter(50. + np.random.randn() * 1.0),
-        g=Parameter(1000. + np.random.randn() * 100.0),  # Match model_fit_LM.py variance
-        c1=Parameter(135 + np.random.randn() * 5.0),
-        c2=Parameter(135 * 0.8 + np.random.randn() * 2.5),
-        c3=Parameter(135 * 0.25 + np.random.randn() * 1.25),
-        c4=Parameter(135 * 0.25 + np.random.randn() * 1.25),
-        std_in=Parameter(100. + np.random.randn() * 10.),
-        vmax=5.0,
-        v0=6.0,
+        # Ae=Parameter(3.25 * u.mV, braintools.SigmoidTransform(2 * u.mV, 10 * u.mV)),
+        # Ai=Parameter(22. * u.mV, braintools.SigmoidTransform(17.0 * u.mV, 110 * u.mV)),
+        # be=Parameter(100. * u.Hz, braintools.SigmoidTransform(5.0 * u.Hz, 150. * u.Hz)),
+        # bi=Parameter(50. * u.Hz, braintools.SigmoidTransform(25.0 * u.Hz, 75 * u.Hz)),
+        # a1=Parameter(1.0, braintools.SigmoidTransform(0.5, 1.5)),
+        # a2=Parameter(0.8, braintools.SigmoidTransform(0.4, 1.2)),
+        # a3=Parameter(0.25, braintools.SigmoidTransform(0.125, 0.375)),
+        # a4=Parameter(0.25, braintools.SigmoidTransform(0.125, 0.375)),
+        # gc=Parameter(1e3, braintools.SigmoidTransform(10, 2e3)),
+        Ae=Parameter(3.25 * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
+        Ai=Parameter(22. * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
+        be=Parameter(100. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
+        bi=Parameter(50. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
+        a1=Parameter(1.0, braintools.SoftplusTransform(0.01)),
+        a2=Parameter(0.8, braintools.SoftplusTransform(0.01)),
+        a3=Parameter(0.25, braintools.SoftplusTransform(0.01)),
+        a4=Parameter(0.25, braintools.SoftplusTransform(0.01)),
+        gc=Parameter(1e3, braintools.SoftplusTransform(100.0)),
+        std_in=Parameter(250 * u.Hz, braintools.SoftplusTransform(100.0 * u.Hz)),
+        # Ae=Parameter(3.25 * u.mV),
+        # Ai=Parameter(22. * u.mV),
+        # be=Parameter(100. * u.Hz),
+        # bi=Parameter(50. * u.Hz),
+        # a1=Parameter(1.0),
+        # a2=Parameter(0.8),
+        # a3=Parameter(0.25),
+        # a4=Parameter(0.25),
+        # gc=Parameter(1e3),
+        s_max=5.0 * u.Hz,
+        v0=6.0 * u.mV,
         r=0.56,
-        y0=Parameter(2.0 * np.ones(output_size) + np.random.randn(output_size) * 0.5),
-        mu=Parameter(1. + np.random.randn() * 0.4),
-        k=Parameter(10. + np.random.randn() * 3.3),
-        cy0=5.0,
-        ki=stim_weights,
+        conduct_lb=2.5,
     )
 
     fitter = ModelFitting(
         net,
-        optimizer=brainstate.optim.Adam(5e-2),  # Match model_fit_LM.py learning rate
-        duration_per_batch=batch_size * tr,
-        time_per_duration=tr,
+        optimizer=brainstate.optim.Adam(1e-2),  # Match model_fit_LM.py learning rate
+        duration_per_batch=n_duration_per_batch * duration_length,
+        time_per_duration=duration_length,
     )
 
     # Create input stimulation like model_fit_LM.py: [n_time, n_nodes]
-    uuu = np.zeros((400, node_size))  # [n_time, n_nodes]
-    uuu[110:120] = 1000  # Stimulation from time 110 to 120
+    uuu = np.zeros((400, n_time_per_duration, node_size)) * u.Hz  # [n_time, n_nodes]
+    uuu[110:120] = 1000. * u.Hz  # Stimulation from time 110 to 120
+    uuu = uuu * stim_weights
     train_out = fitter.train(data_mean[900:1300], uuu, n_epoch=200)
 
     # Test with same stimulation
-    uuu_test = np.zeros((400, node_size))
-    uuu_test[110:120] = 1000
+    uuu_test = np.zeros((400, n_time_per_duration, node_size)) * u.Hz
+    uuu_test[110:120] = 1000. * u.Hz
+    uuu_test = uuu_test * stim_weights
     test_out = fitter.test(uuu_test, base_batch_num=20, data=data_mean[900:1300])
-
-    # outfilename = f'reproduce_fig/sub_{sub_index}_simEEG_stim_exp.pkl'
-    # with open(outfilename, 'wb') as f:
-    #     pickle.dump({'train': train_out, 'test': test_out}, f)
-    #
-    # sc = net.effective_sc()
-    # fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-    # ax.imshow(np.log1p(sc), cmap='bwr')
-    # plt.show()
-    #
-    # fig, ax = plt.subplots(1, 3, figsize=(12, 8))
-    # ax[0].plot((test_out.E - test_out.I).T)
-    # ax[0].set_title('Test: sourced EEG')
-    # ax[1].plot(test_out.eeg.T)
-    # ax[1].set_title('Test')
-    # ax[2].plot(data_high['only_high_trial'][sub_index].T[900:1300, :])
-    # ax[2].set_title('empirical')
-    # plt.show()
 
 
 # %%

@@ -50,8 +50,7 @@ class GaussianNoise(Noise):
         super().__init__(in_size=in_size)
 
         self.sigma = sigma
-        mean = 0. * u.get_unit(sigma) if mean is None else mean
-        self.mean = mean
+        self.mean = 0. * u.get_unit(sigma) if mean is None else mean
 
     def update(self):
         z = brainstate.random.normal(loc=0.0, scale=1.0, size=self.varshape)
