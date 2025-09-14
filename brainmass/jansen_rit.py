@@ -27,16 +27,6 @@ __all__ = [
 ]
 
 
-class Scale:
-    def __init__(self, slope: float, fn: Callable = u.math.tanh):
-        self.slope = slope
-        self.fn = fn
-
-    def __call__(self, x):
-        x, unit = u.split_mantissa_unit(x)
-        return u.maybe_decimal(self.slope * self.fn(x / self.slope) * unit)
-
-
 class Identity:
     def __call__(self, x):
         return x
@@ -46,46 +36,41 @@ class JansenRitModel(brainstate.nn.Dynamics):
     r"""
     Jansen-Rit neural mass model.
 
-    Jansen-Rit neural mass model is governed by the system of coupled differential equations.
-    In this system, indices 0, 2, and 4 represent the pyramidal, excitatory, and inhibitory
-    neuron populations, respectively. The output signal $y(t)=a_2y_2-a_4y_4$ represents the
-    difference between the pyramidal’s excitatory and inhibitory postsynaptic potentials.
-    This value is a proxy for EEG sources because EEG is thought to reflect mainly the
-    postsynaptic potentials in the apical dendrites of pyramidal cells [1]. Table 1 shows
-    the default parameter values and ranges used in our simulations based on physiologically
-    plausible values from previous studies [2, 3].
+    This implementation follows the standard three-population Jansen–Rit formulation
+    with state variables for the pyramidal (M), excitatory interneuron (E), and
+    inhibitory interneuron (I) membrane potentials and their first derivatives
+    (Mv, Ev, Iv):
 
     $$
     \begin{aligned}
-    & \dot{y}_{0}=y_1,\\
-    & \dot{y_2}=y_3,\\
-    & \dot{y_4}=y_5,\\
-    &\dot{y}_{1}=A_eb_eS(I_p+a_2y_2-a_4y_4)-2b_ey_1-b_e^2y_0,\\
-    &\dot{y}_{3}=A_eb_eS(a_1y_0)-2b_ey_3-b_e^2y_2,\\
-    &\ddot{y}_{5}=A_ib_iS(I_i+a_3y_0)-2b_iy_5-b_i^2y_4.
+    &\dot{M}= M_v, \\
+    &\dot{E}= E_v, \\
+    &\dot{I}= I_v, \\
+    &\dot{M}_v= A_e b_e\,\text{scale}\big(S(E - I + M_{\text{inp}})\big) - 2 b_e M_v - b_e^2 M, \\
+    &\dot{E}_v= A_e b_e\,\text{scale}\big(E_{\text{inp}} + C a_2 S(C a_1 M)\big) - 2 b_e E_v - b_e^2 E, \\
+    &\dot{I}_v= A_i b_i\,\text{scale}\big(C a_4 S(C a_3 M + I_{\text{inp}})\big) - 2 b_i I_v - b_i^2 I.
     \end{aligned}
     $$
 
-    The sigmoid function $S(v)$ translates the mean membrane potential $v$ of a specific population
-    into its mean firing rate. It is expressed as:
+    The static nonlinearity maps membrane potential to firing rate:
 
     $$
-    S(v)=2*S_{\max } \cdot \frac{1}{1+e^{-r\left(v-v_0\right)}}
+    S(v) = \frac{s_{\max}}{1 + e^{\, r (v_0 - v)/\mathrm{mV}}},
     $$
 
-    The parameters $v_0$ and $r$ regulate the midpoint and steepness of the sigmoidal curve,
-    whereas $S_{\max }$ captures the maximal firing rate for the population. As $v$ increases,
-    $S(v)$ gradually rises from 0 to $S_{\max }$, capturing the activation level of the neuron
-    population. Default, we used $v_0=6, r=0.56$ and $S_{\max }=5$ spikes per second.
+    yielding values in $[0, s_{\max}]$. Here, $v$ is in mV, $s_{\max}$ in s$^{-1}$,
+    $v_0$ in mV, and $r$ is dimensionless.
 
-    $y_0$, $y_2$, and $y_4$ represent the average membrane potentials of the pyramidal,
-    excitatory, and inhibitory neuron populations, respectively. They have the unit of mV.
-    $y_1$, $y_3$, and $y_5$ are the first derivatives of $y_0$, $y_2$, and $y_4$,
-    respectively, with the unit of mV/s. $I_p$ and $I_i$ are the external inputs to the
-    excitatory and inhibitory populations, respectively, with the unit of mV. In this study,
-    we set both $I_p$ and $I_i$ to zero.
+    Inputs and units:
 
-    Standard parameter settings for the Jansen-Rit model. Only parameters with a
+    - `M_inp` (mV) shifts the pyramidal population input inside the sigmoid in $\dot{M}_v$.
+    - `E_inp` (s$^{-1}$) is added to the excitatory firing-rate drive in $\dot{E}_v$.
+    - `I_inp` (mV) shifts the inhibitory population input inside the sigmoid in $\dot{I}_v$.
+
+    The EEG-like output proxy returned by `eeg()` is the difference between excitatory
+    and inhibitory postsynaptic potentials at the pyramidal population, i.e. `E - I`.
+
+    Standard parameter settings for the Jansen–Rit model. Only parameters with a
     specified "Range" are estimated in this study.
 
     .. list-table::
@@ -145,12 +130,54 @@ class JansenRitModel(brainstate.nn.Dynamics):
          - 0.56
          - -
 
+    Parameters
+    ----------
+    in_size : `brainstate.typing.Size`
+        Variable shape for parameter/state broadcasting.
+    Ae : `ArrayLike` or `Callable`, default `3.25 * u.mV`
+        Excitatory gain (mV).
+    Ai : `ArrayLike` or `Callable`, default `22. * u.mV`
+        Inhibitory gain (mV).
+    be : `ArrayLike` or `Callable`, default `100. * u.Hz`
+        Excitatory inverse time constant (s^-1).
+    bi : `ArrayLike` or `Callable`, default `50. * u.Hz`
+        Inhibitory inverse time constant (s^-1).
+    C : `ArrayLike` or `Callable`, default `135.`
+        Global connectivity scaling (dimensionless).
+    a1, a2, a3, a4 : `ArrayLike` or `Callable`, defaults `1., 0.8, 0.25, 0.25`
+        Connectivity parameters (dimensionless) used as in the equations above.
+    s_max : `ArrayLike` or `Callable`, default `2.5 * u.Hz`
+        Maximum firing rate for the sigmoid, units s^-1.
+    v0 : `ArrayLike` or `Callable`, default `6. * u.mV`
+        Sigmoid midpoint (mV).
+    r : `ArrayLike` or `Callable`, default `0.56`
+        Sigmoid steepness (dimensionless).
+    M_init, E_init, I_init : `Callable`, defaults `ZeroInit(unit=u.mV)`
+        Initializers for membrane potentials (mV).
+    Mv_init, Ev_init, Iv_init : `Callable`, defaults `ZeroInit(unit=u.mV/u.second)`
+        Initializers for potential derivatives (mV/s).
+    fr_scale : `Callable`, default `Identity()`
+        Optional scaling applied to firing-rate drives; receives rates in s^-1
+        and returns scaled rates.
+    noise_E, noise_I, noise_M : `Noise` or `None`, default `None`
+        Optional additive noise sources applied to `E_inp`, `I_inp`, and `M_inp`
+        respectively.
+    method : `str`, default `'exp_euler'`
+        Integrator name. `'exp_euler'` uses `brainstate.nn.exp_euler_step`; any
+        other value dispatches to `braintools.quad.ode_{method}_step`.
+
+    Notes
+    -----
+    - In this implementation `fr_scale` is applied to the firing-rate drive terms
+      and defaults to the identity.
+    - Variable naming: $(M, E, I)$ correspond to pyramidal, excitatory, and inhibitory
+      population membrane potentials (mV); $(M_v, E_v, I_v)$ are their time derivatives (mV/s).
+
     References
     ----------
-
-    - [1] Nunez P L, Srinivasan R. Electric fields of the brain: the neurophysics of EEG[M]. Oxford university press, 2006.
-    - [2] Jansen B H, Rit V G. Electroencephalogram and visual evoked potential generation in a mathematical model of coupled cortical columns[J]. Biological cybernetics, 1995, 73(4): 357-366.
-    - [3] David O, Friston K J. A neural mass model for MEG/EEG:: coupling and neuronal dynamics[J]. NeuroImage, 2003, 20(3): 1743-1755.
+    - [1] Nunez P L, Srinivasan R. Electric fields of the brain: the neurophysics of EEG. Oxford University Press, 2006.
+    - [2] Jansen B H, Rit V G. Electroencephalogram and visual evoked potential generation in a mathematical model of coupled cortical columns. Biological Cybernetics, 1995, 73(4): 357–366.
+    - [3] David O, Friston K J. A neural mass model for MEG/EEG: coupling and neuronal dynamics. NeuroImage, 2003, 20(3): 1743–1755.
     """
 
     def __init__(
