@@ -208,7 +208,7 @@ class OUProcess(Noise):
         mean: brainstate.typing.ArrayLike = None,  # noise mean value
         sigma: brainstate.typing.ArrayLike = 1. * u.nA,  # noise amplitude
         tau: brainstate.typing.ArrayLike = 10. * u.ms,  # time constant
-        init: Callable = brainstate.init.ZeroInit(unit=u.nA)
+        init: Callable = None
     ):
         super().__init__(in_size=in_size)
 
@@ -216,7 +216,7 @@ class OUProcess(Noise):
         self.sigma = sigma
         self.mean = 0. * u.get_unit(sigma) if mean is None else mean
         self.tau = tau
-        self.init = init
+        self.init = brainstate.init.ZeroInit(unit=u.get_unit(sigma)) if init is None else init
 
     def init_state(self, batch_size=None, **kwargs):
         self.x = brainstate.HiddenState(brainstate.init.param(self.init, self.varshape, batch_size))

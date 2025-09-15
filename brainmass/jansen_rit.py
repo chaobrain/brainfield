@@ -192,7 +192,7 @@ class JansenRitModel(brainstate.nn.Dynamics):
         a2: Union[brainstate.typing.ArrayLike, Callable] = 0.8,  # Connect. param.
         a3: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param
         a4: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param.
-        s_max: Union[brainstate.typing.ArrayLike, Callable] = 2.5 * u.Hz,  # Max firing rate
+        s_max: Union[brainstate.typing.ArrayLike, Callable] = 5.0 * u.Hz,  # Max firing rate
         v0: Union[brainstate.typing.ArrayLike, Callable] = 6. * u.mV,  # Firing threshold
         r: Union[brainstate.typing.ArrayLike, Callable] = 0.56,  # Sigmoid steepness
         M_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
