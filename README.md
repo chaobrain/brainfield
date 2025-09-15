@@ -42,6 +42,8 @@ For TPU support:
 pip install brainmass[tpu]
 ```
 
+### Ecosystem
+
 For whole brain modeling ecosystem:
 ```bash
 pip install BrainX 
@@ -52,113 +54,6 @@ pip install BrainX[cuda12]
 # TPU support
 pip install BrainX[tpu]
 ```
-
-
-
-
-## Quick Start
-
-### Single Node Simulation
-
-```python
-import brainstate
-import brainmass
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Set simulation parameters
-brainstate.environ.set(dt=0.1)
-
-# Create a Wilson-Cowan model with noise
-node = brainmass.WilsonCowanModel(
-    1,
-    noise_E=brainmass.OUProcess(1, sigma=0.01),
-    noise_I=brainmass.OUProcess(1, sigma=0.01),
-)
-
-# Initialize model states
-brainstate.nn.init_all_states(node)
-
-# Define simulation function
-def step_run(i):
-    with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-        return node.update()
-
-# Run simulation
-indices = np.arange(10000)
-activity = brainstate.transform.for_loop(step_run, indices)
-
-# Plot results
-plt.plot(indices * brainstate.environ.get_dt(), activity)
-plt.xlabel("Time [ms]")
-plt.ylabel("Neural Activity")
-plt.show()
-```
-
-### Brain Network Simulation
-
-```python
-import brainstate
-import brainmass
-from datasets import Dataset
-import numpy as np
-
-# Load brain connectivity data
-hcp = Dataset('hcp')
-
-class BrainNetwork(brainstate.nn.Module):
-    def __init__(self, signal_speed=2., k=1.):
-        super().__init__()
-        
-        # Get connectivity and distance matrices
-        conn_weight = hcp.Cmat
-        np.fill_diagonal(conn_weight, 0)
-        delay_time = hcp.Dmat / signal_speed
-        np.fill_diagonal(delay_time, 0)
-        indices_ = np.tile(np.arange(conn_weight.shape[1]), conn_weight.shape[0])
-        
-        # Create network nodes
-        self.node = brainmass.WilsonCowanModel(
-            80,  # 80 brain regions
-            noise_E=brainmass.OUProcess(80, sigma=0.01),
-            noise_I=brainmass.OUProcess(80, sigma=0.01),
-        )
-        
-        # Define coupling between regions
-        self.coupling = brainmass.DiffusiveCoupling(
-            self.node.prefetch_delay('rE', (delay_time.flatten(), indices_), 
-                                   init=brainstate.init.Uniform(0, 0.05)),
-            self.node.prefetch('rE'),
-            conn_weight,
-            k=k
-        )
-    
-    def update(self):
-        current = self.coupling()
-        rE = self.node(current)
-        return rE
-    
-    def step_run(self, i):
-        with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-            return self.update()
-
-# Create and run network simulation
-net = BrainNetwork()
-brainstate.nn.init_all_states(net)
-indices = np.arange(0, 6000 // brainstate.environ.get_dt())
-brain_activity = brainstate.transform.for_loop(net.step_run, indices)
-```
-
-
-## Examples and Tutorials
-
-The `examples/` directory contains Jupyter notebooks demonstrating:
-
-- **Single Node Dynamics**: Basic Wilson-Cowan model simulation
-- **Bifurcation Analysis**: Parameter space exploration
-- **Brain Network Modeling**: Whole-brain connectivity simulations
-- **Parameter Optimization**: Using Nevergrad for parameter tuning
-- **BOLD Signal Analysis**: Hemodynamic response modeling
 
 
 ## Dependencies

@@ -13,19 +13,20 @@
 # limitations under the License.
 # ==============================================================================
 
-__version__ = "0.0.1"
+__version__ = "0.0.3"
 
-__all__ = [
-    'DiffusiveCoupling',
-    'AdditiveCoupling',
-    'WilsonCowanModel',
-    'OUProcess',
-    'BOLDSignal',
-    'HopfModel',
-]
-
-from .bold import *
 from .coupling import *
+from .coupling import __all__ as coupling_all
+from .forward_model import *
+from .forward_model import __all__ as forward_model_all
+from .jansen_rit import *
+from .jansen_rit import __all__ as jansen_rit_all
 from .noise import *
+from .noise import __all__ as noise_all
 from .wilson_cowan import *
-from .hopf import *
+from .wilson_cowan import __all__ as wilson_cowan_all
+from .wong_wang import *
+from .wong_wang import __all__ as wong_wang_all
+
+__all__ = forward_model_all + coupling_all + jansen_rit_all + noise_all + wilson_cowan_all + wong_wang_all
+del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all
