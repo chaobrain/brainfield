@@ -23,6 +23,7 @@ __all__ = [
     'BOLDSignal',
     'HopfModel',
     'HopfCoupling', 
+    'AlnModel'
 ]
 
 from .bold import *
@@ -30,4 +31,5 @@ from .coupling import DiffusiveCoupling, AdditiveCoupling
 from .noise import *
 from .wilson_cowan import *
 from .hopf import *
+from .aln import *
 
