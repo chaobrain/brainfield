@@ -38,6 +38,7 @@ packages = find_packages(
         "build*",
         "dev*",
         "dist*",
+        "examples*",
         "brainmass.egg-info*",
         "brainmass/__pycache__*"
     ]
@@ -54,7 +55,7 @@ setup(
     author_email='chao.brain@qq.com',
     packages=packages,
     python_requires='>=3.10',
-    install_requires=['numpy', 'jax', 'brainstate>=0.1.8', 'brainunit'],
+    install_requires=['numpy', 'jax', 'brainstate>=0.1.8', 'brainunit', 'braintools'],
     url='https://github.com/chaobrain/brainmass',
     project_urls={
         "Bug Tracker": "https://github.com/chaobrain/brainmass/issues",
