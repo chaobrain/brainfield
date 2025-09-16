@@ -15,8 +15,6 @@
 
 __version__ = "0.0.3"
 
-from .aln import *
-from .aln import __all__ as aln_all
 from .coupling import *
 from .coupling import __all__ as coupling_all
 from .forward_model import *
@@ -33,5 +31,4 @@ from .wong_wang import *
 from .wong_wang import __all__ as wong_wang_all
 
 __all__ = forward_model_all + coupling_all + jansen_rit_all + noise_all + wilson_cowan_all + wong_wang_all + hopf_all
-__all__ = __all__ + aln_all
-del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all, hopf_all, aln_all
+del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all, hopf_all
