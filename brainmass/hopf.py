@@ -27,7 +27,7 @@ __all__ = [
 
 
 class HopfModel(brainstate.nn.Dynamics):
-    """
+    r"""
     The adaptive linear-nonlinear (aln) cascade model is a low-dimensional 
     population model of spiking neural networks. Mathematically, 
     it is a dynamical system of non-linear ODEs. 
