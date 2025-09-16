@@ -88,7 +88,7 @@ If you use BrainMass in your research, please cite:
   author={BrainMass Developers},
   url={https://github.com/chaobrain/brainmass},
   version={0.0.1},
-  year={2024}
+  year={2025}
 }
 ```
 
