@@ -110,19 +110,24 @@ plt.xlabel("Input to exc")
 plt.ylabel("Min / max exc")
 plt.show()
 #%% md
+# ## Load HCP connectome data
+#%%
+import os.path
+import kagglehub
+path = kagglehub.dataset_download("oujago/hcp-gw-data-samples")
+data = braintools.file.msgpack_load(os.path.join(path, "hcp-data-sample.msgpack"))
+#%% md
 # ## Brain network
 #%% md
 # We now couple many Wilson–Cowan nodes according to structural connectivity (weights `Cmat`) and distances `Dmat` from the `hcp` dataset. Delays are derived from distances and a `signal_speed`. We use diffusive coupling on `rE` with per‑edge delays and scale the interaction by a global gain `k`.
-#%%
-hcp = Dataset('hcp')
 #%%
 class Network(brainstate.nn.Module):
     def __init__(self, signal_speed=2., k=1.):
         super().__init__()
 
-        conn_weight = hcp.Cmat
+        conn_weight = data['Cmat'].copy()
         np.fill_diagonal(conn_weight, 0)
-        delay_time = hcp.Dmat / signal_speed
+        delay_time = data['Dmat'].copy() / signal_speed
         np.fill_diagonal(delay_time, 0)
         indices_ = np.arange(conn_weight.shape[1])
         indices_ = np.tile(np.expand_dims(indices_, axis=0), (conn_weight.shape[0], 1))
