@@ -13,6 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 
+
+__version_info__ = (0, 0, 3)
 __version__ = "0.0.3"
 
 from .coupling import *
