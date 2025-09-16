@@ -63,11 +63,11 @@ Core dependencies:
 - `numpy`: Numerical computations
 - `brainstate`: State management and neural dynamics
 - `brainunit`: Unit system for neuroscience
-- `brainscale`: Scaling utilities
-
-Optional dependencies:
-- `matplotlib`: Plotting and visualization
+- `brainscale`: Online learning support
 - `braintools`: Additional analysis tools
+
+  Optional dependencies:
+- `matplotlib`: Plotting and visualization
 - `nevergrad`: Parameter optimization
 
 ## Documentation
