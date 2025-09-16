@@ -29,6 +29,7 @@ Node Dynamics
     JansenRitModel
     WilsonCowanModel
     WongWangModel
+    HopfModel
 
 
 
