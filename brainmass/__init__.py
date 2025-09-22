@@ -14,8 +14,8 @@
 # ==============================================================================
 
 
-__version_info__ = (0, 0, 3)
-__version__ = "0.0.3"
+__version_info__ = (0, 0, 4)
+__version__ = "0.0.4"
 
 from .coupling import *
 from .coupling import __all__ as coupling_all
@@ -27,10 +27,14 @@ from .jansen_rit import *
 from .jansen_rit import __all__ as jansen_rit_all
 from .noise import *
 from .noise import __all__ as noise_all
+from .param import *
+from .param import __all__ as param_all
 from .wilson_cowan import *
 from .wilson_cowan import __all__ as wilson_cowan_all
 from .wong_wang import *
 from .wong_wang import __all__ as wong_wang_all
 
 __all__ = forward_model_all + coupling_all + jansen_rit_all + noise_all + wilson_cowan_all + wong_wang_all + hopf_all
+__all__ = __all__ + param_all
 del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all, hopf_all
+del param_all
