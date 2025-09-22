@@ -27,6 +27,8 @@ from .hopf import *
 from .hopf import __all__ as hopf_all
 from .jansen_rit import *
 from .jansen_rit import __all__ as jansen_rit_all
+from .kuramoto import *
+from .kuramoto import __all__ as kuramoto_all
 from .linear import *
 from .linear import __all__ as linear_all
 from .noise import *
@@ -41,6 +43,6 @@ from .wong_wang import *
 from .wong_wang import __all__ as wong_wang_all
 
 __all__ = forward_model_all + coupling_all + jansen_rit_all + noise_all + wilson_cowan_all + wong_wang_all + hopf_all
-__all__ = __all__ + param_all + fhn_all + linear_all + vdp_all
+__all__ = __all__ + param_all + fhn_all + linear_all + vdp_all + kuramoto_all
 del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all, hopf_all
-del param_all, fhn_all, linear_all, vdp_all
+del param_all, fhn_all, linear_all, vdp_all, kuramoto_all

@@ -94,6 +94,7 @@ Example (Wilson–Cowan):
     WongWangModel
     FitzHughNagumoModel
     ThresholdLinearModel
+    KuramotoModel
     HopfOscillator
     VanDerPolOscillator
     StuartLandauOscillator
