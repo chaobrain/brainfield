@@ -20,6 +20,7 @@ import brainunit as u
 import jax
 import jax.numpy as jnp
 
+from ._typing import Initializer
 import braintools
 
 Array = jax.Array
@@ -95,11 +96,11 @@ class BOLDSignal(brainstate.nn.Dynamics):
     def __init__(
         self,
         in_size,
-        gamma: Union[brainstate.typing.ArrayLike, Callable] = 0.41,
-        k: Union[brainstate.typing.ArrayLike, Callable] = 0.65,
-        alpha: Union[brainstate.typing.ArrayLike, Callable] = 0.32,
-        tau: Union[brainstate.typing.ArrayLike, Callable] = 0.98,
-        rho: Union[brainstate.typing.ArrayLike, Callable] = 0.34,
+        gamma: Initializer = 0.41,
+        k: Initializer = 0.65,
+        alpha: Initializer = 0.32,
+        tau: Initializer = 0.98,
+        rho: Initializer = 0.34,
         V0: float = 0.02,
         init: Callable = brainstate.init.Constant(1.),
     ):

@@ -20,6 +20,7 @@ import brainunit as u
 import jax.numpy as jnp
 
 from .noise import Noise
+from ._typing import Initializer
 
 __all__ = [
     'WilsonCowanModel',
@@ -39,37 +40,37 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     in_size : brainstate.typing.Size
         Spatial shape of each population (E and I). Can be an int, a tuple of
         ints, or any size compatible with ``brainstate``.
-    tau_E : brainstate.typing.ArrayLike, optional
+    tau_E : Initializer, optional
         Excitatory time constant with unit of time (e.g., ``1. * u.ms``).
         Broadcastable to ``in_size``. Default is ``1. * u.ms``.
-    a_E : brainstate.typing.ArrayLike, optional
+    a_E : Initializer, optional
         Excitatory gain (dimensionless). Broadcastable to ``in_size``.
         Default is ``1.2``.
-    theta_E : brainstate.typing.ArrayLike, optional
+    theta_E : Initializer, optional
         Excitatory threshold (dimensionless). Broadcastable to ``in_size``.
         Default is ``2.8``.
-    tau_I : brainstate.typing.ArrayLike, optional
+    tau_I : Initializer, optional
         Inhibitory time constant with unit of time (e.g., ``1. * u.ms``).
         Broadcastable to ``in_size``. Default is ``1. * u.ms``.
-    a_I : brainstate.typing.ArrayLike, optional
+    a_I : Initializer, optional
         Inhibitory gain (dimensionless). Broadcastable to ``in_size``.
         Default is ``1.``.
-    theta_I : brainstate.typing.ArrayLike, optional
+    theta_I : Initializer, optional
         Inhibitory threshold (dimensionless). Broadcastable to ``in_size``.
         Default is ``4.0``.
-    wEE : brainstate.typing.ArrayLike, optional
+    wEE : Initializer, optional
         E→E coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``12.``.
-    wIE : brainstate.typing.ArrayLike, optional
+    wIE : Initializer, optional
         E→I coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``4.``.
-    wEI : brainstate.typing.ArrayLike, optional
+    wEI : Initializer, optional
         I→E coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``13.``.
-    wII : brainstate.typing.ArrayLike, optional
+    wII : Initializer, optional
         I→I coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``11.``.
-    r : brainstate.typing.ArrayLike, optional
+    r : Initializer, optional
         Refractory parameter (dimensionless) that limits maximum activation.
         Broadcastable to ``in_size``. Default is ``1.``.
     noise_E : Noise or None, optional
@@ -125,23 +126,23 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         in_size: brainstate.typing.Size,
 
         # Excitatory parameters
-        tau_E: brainstate.typing.ArrayLike = 1. * u.ms,  # excitatory time constant (ms)
-        a_E: brainstate.typing.ArrayLike = 1.2,  # excitatory gain (dimensionless)
-        theta_E: brainstate.typing.ArrayLike = 2.8,  # excitatory firing threshold (dimensionless)
+        tau_E: Initializer = 1. * u.ms,  # excitatory time constant (ms)
+        a_E: Initializer = 1.2,  # excitatory gain (dimensionless)
+        theta_E: Initializer = 2.8,  # excitatory firing threshold (dimensionless)
 
         # Inhibitory parameters
-        tau_I: brainstate.typing.ArrayLike = 1. * u.ms,  # inhibitory time constant (ms)
-        a_I: brainstate.typing.ArrayLike = 1.,  # inhibitory gain (dimensionless)
-        theta_I: brainstate.typing.ArrayLike = 4.0,  # inhibitory firing threshold (dimensionless)
+        tau_I: Initializer = 1. * u.ms,  # inhibitory time constant (ms)
+        a_I: Initializer = 1.,  # inhibitory gain (dimensionless)
+        theta_I: Initializer = 4.0,  # inhibitory firing threshold (dimensionless)
 
         # Connection parameters
-        wEE: brainstate.typing.ArrayLike = 12.,  # local E-E coupling (dimensionless)
-        wIE: brainstate.typing.ArrayLike = 4.,  # local E-I coupling (dimensionless)
-        wEI: brainstate.typing.ArrayLike = 13.,  # local I-E coupling (dimensionless)
-        wII: brainstate.typing.ArrayLike = 11.,  # local I-I coupling (dimensionless)
+        wEE: Initializer = 12.,  # local E-E coupling (dimensionless)
+        wIE: Initializer = 4.,  # local E-I coupling (dimensionless)
+        wEI: Initializer = 13.,  # local I-E coupling (dimensionless)
+        wII: Initializer = 11.,  # local I-I coupling (dimensionless)
 
         # Refractory parameter
-        r: brainstate.typing.ArrayLike = 1.,  # refractory parameter (dimensionless)
+        r: Initializer = 1.,  # refractory parameter (dimensionless)
 
         # noise
         noise_E: Noise = None,  # excitatory noise process
