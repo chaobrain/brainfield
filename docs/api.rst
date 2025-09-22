@@ -96,6 +96,7 @@ Example (Wilson–Cowan):
     ThresholdLinearModel
     HopfOscillator
     VanDerPolOscillator
+    StuartLandauOscillator
 
 
 

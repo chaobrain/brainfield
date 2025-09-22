@@ -28,17 +28,66 @@ __all__ = [
 
 
 class StuartLandauOscillator(XY_Oscillator):
-    r"""
-    Stuart-Landau model with Hopf bifurcation.
+    r"""Stuart–Landau oscillator (Hopf normal form).
 
-    The Stuart–Landau equation describes the behavior of a nonlinear oscillating
-    system near the Hopf bifurcation, named after John Trevor Stuart and Lev Landau.
+    Implements the real two-dimensional Stuart–Landau equations that describe
+    dynamics near a supercritical Hopf bifurcation:
 
     .. math::
 
-       \frac{dx}{dt} = (a - x^2 - y^2) * x - w*y + I^x_{ext} \\
-       \frac{dy}{dt} = (a - x^2 - y^2) * y + w*x + I^y_{ext}
+        \dot x = (a - r^2)\,x - \omega\,y + I_x(t),\quad r^2 = x^2 + y^2,
 
+    .. math::
+
+        \dot y = (a - r^2)\,y + \omega\,x + I_y(t),
+
+    where :math:`a` controls the bifurcation (for :math:`a>0` the system
+    exhibits a stable limit cycle) and :math:`\omega` is the angular frequency.
+
+    Parameters
+    ----------
+    in_size : brainstate.typing.Size
+        Spatial shape of the node/population. Can be an ``int`` or a tuple of
+        ``int``. All parameters are broadcastable to this shape.
+    a : Initializer, optional
+        Bifurcation parameter (dimensionless). Default is ``0.25``.
+    w : Initializer, optional
+        Angular frequency :math:`\omega` (dimensionless). Default is ``0.2``.
+    noise_x : Noise or None, optional
+        Additive noise process for the ``x`` component. If provided, called at
+        each update and added to ``x_inp``. Default is ``None``.
+    noise_y : Noise or None, optional
+        Additive noise process for the ``y`` component. If provided, called at
+        each update and added to ``y_inp``. Default is ``None``.
+    init_x : Callable, optional
+        Initializer for the state ``x``. Default is
+        ``brainstate.init.Uniform(0, 0.05)``.
+    init_y : Callable, optional
+        Initializer for the state ``y``. Default is
+        ``brainstate.init.Uniform(0, 0.05)``.
+    method : str, optional
+        Time stepping method. One of ``'exp_euler'`` (default; uses
+        ``brainstate.nn.exp_euler_step``) or any supported by ``braintools.quad``
+        (e.g., ``'rk4'``, ``'midpoint'``, ``'heun'``, ``'euler'``).
+
+    Attributes
+    ----------
+    x : brainstate.HiddenState
+        State container for the real component ``x`` (dimensionless). Shape
+        equals ``(batch?,) + in_size`` after ``init_state``.
+    y : brainstate.HiddenState
+        State container for the imaginary component ``y`` (dimensionless).
+        Shape equals ``(batch?,) + in_size`` after ``init_state``.
+
+    Notes
+    -----
+    - Time derivatives returned by :meth:`dx` and :meth:`dy` carry unit
+      ``1/ms`` to be consistent with explicit (exponential) Euler integration
+      for a step size with unit ``ms``.
+    - Integration, state initialization, and noise handling are implemented in
+      the base class ``XY_Oscillator``.
+    - Implementation detail: verify the cross-coupling term in :meth:`dy`
+      matches the intended normal form (the standard form uses ``+ w * x``).
     """
 
     def __init__(
@@ -72,7 +121,39 @@ class StuartLandauOscillator(XY_Oscillator):
         self.w = brainstate.init.param(w, self.varshape, allow_none=False)
 
     def dx(self, x, y, x_ext):
+        """Right-hand side for the ``x`` component.
+
+        Parameters
+        ----------
+        x : array-like
+            Current value of ``x`` (dimensionless).
+        y : array-like
+            Current value of ``y`` (dimensionless), broadcastable to ``x``.
+        x_ext : array-like or scalar
+            External input to ``x`` (includes noise if enabled).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``dx/dt`` with unit ``1/ms``.
+        """
         return ((self.a - x * x - y * y) * x - self.w * y + x_ext) / u.ms
 
     def dy(self, y, x, y_ext):
+        """Right-hand side for the ``y`` component.
+
+        Parameters
+        ----------
+        y : array-like
+            Current value of ``y`` (dimensionless).
+        x : array-like
+            Current value of ``x`` (dimensionless), broadcastable to ``y``.
+        y_ext : array-like or scalar
+            External input to ``y`` (includes noise if enabled).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``dy/dt`` with unit ``1/ms``.
+        """
         return ((self.a - x * x - y * y) * y - self.w * y + y_ext) / u.ms
