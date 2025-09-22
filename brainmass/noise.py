@@ -89,9 +89,8 @@ class BrownianNoise(Noise):
         self.x.value = brainstate.init.param(self.init, self.varshape, batch_size)
 
     def update(self):
-        dt = brainstate.environ.get_dt() / u.get_unit(self.sigma)
-        z = brainstate.random.normal(loc=0.0, scale=1.0, size=self.varshape)
-        self.x.value = self.x.value + self.sigma * u.math.sqrt(dt) * z
+        dt = brainstate.environ.get_dt() / u.ms
+        self.x.value = self.x.value + self.sigma * u.math.sqrt(dt) * brainstate.random.randn(*self.varshape)
         return self.mean + self.x.value
 
 
