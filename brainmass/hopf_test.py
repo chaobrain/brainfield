@@ -147,10 +147,10 @@ class TestHopfModel:
 
     def test_noise_assertions_single_side(self):
         # Only one noise provided should raise when updating
-        n = brainmass.OUProcess(1)
+        n = brainmass.OUProcess(1, sigma=1.0)
 
         m_x = brainmass.HopfOscillator(in_size=1, noise_x=n, noise_y=None)
-        m_x.init_state()
+        brainstate.nn.init_all_states(m_x)
         with brainstate.environ.context(dt=0.1 * u.ms):
             try:
                 _ = m_x.update(0.0, 0.0)
