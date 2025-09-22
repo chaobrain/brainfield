@@ -16,11 +16,12 @@
 from typing import Callable
 
 import brainstate
+import braintools
 import brainunit as u
 import jax.numpy as jnp
 
-from .noise import Noise
 from ._typing import Initializer
+from .noise import Noise
 
 __all__ = [
     'WilsonCowanModel',
@@ -85,6 +86,11 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     rI_init : Callable, optional
         Initializer for the inhibitory state ``rI``. Default is
         ``brainstate.init.ZeroInit()``.
+    method: str
+        The numerical integration method to use. One of ``'exp_euler'``,
+        ``'euler'``, ``'rk2'``, or ``'rk4'``, that is implemented in
+        ``braintools.quad``. Default is ``'exp_euler'``.
+
 
     Attributes
     ----------
@@ -151,6 +157,7 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         # initialization
         rE_init: Callable = brainstate.init.ZeroInit(),
         rI_init: Callable = brainstate.init.ZeroInit(),
+        method: str = 'exp_euler',
     ):
         super().__init__(in_size=in_size)
 
@@ -171,6 +178,7 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         assert isinstance(noise_E, Noise) or noise_E is None, "noise_E must be an OUProcess or None"
         self.rE_init = rE_init
         self.rI_init = rI_init
+        self.method = method
 
     def init_state(self, batch_size=None, **kwargs):
         self.rE = brainstate.HiddenState(brainstate.init.param(self.rE_init, self.varshape, batch_size))
@@ -240,6 +248,12 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         xx = self.wEI * rE - self.wII * rI + ext
         return (-rI + (1 - self.r * rI) * self.F(xx, self.a_I, self.theta_I)) / self.tau_I
 
+    def derivaitive(self, state, t, E_exp, I_exp):
+        rE, rI = state
+        drE_dt = self.drE(rE, rI, E_exp)
+        drI_dt = self.drI(rI, rE, I_exp)
+        return (drE_dt, drI_dt)
+
     def update(self, rE_inp=None, rI_inp=None):
         """Advance the system by one time step.
 
@@ -277,9 +291,16 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         rI_inp = self.sum_delta_inputs(rI_inp, label='I')
 
         # update the state variables
-        rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_inp)
-        rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_inp)
+        if self.method == 'exp_euler':
+            rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_inp)
+            rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_inp)
+        else:
+            rE, rI = getattr(braintools.quad, f'ode_{self.method}_step')(
+                (self.rE.value, self.rI.value),
+                0. * u.ms,
+                rE_inp,
+                rI_inp,
+            )
         self.rE.value = rE
         self.rI.value = rI
         return rE
-
