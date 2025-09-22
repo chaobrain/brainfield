@@ -62,7 +62,7 @@ and coupling, then transform model observables to measurements via a forward mod
    # y = lead(s)  # shape (T, M) with EEG units
 
 
-Node Dynamics
+Node dynamics
 -------------
 
 These are the core neural population models. Each class derives from
@@ -93,10 +93,12 @@ Example (Wilson–Cowan):
     WilsonCowanModel
     WongWangModel
     HopfModel
+    FitzHughNagumoModel
+    ThresholdLinearModel
 
 
 
-Noise Processes
+Noise processes
 ---------------
 
 Noise processes generate unit-safe stochastic drive you can add to node models.
@@ -133,7 +135,7 @@ attributes, e.g., ``WilsonCowanModel(noise_E=..., noise_I=...)``.
 
 
 
-Node Coupling
+Node coupling
 -------------
 
 Coupling maps activity from source nodes to target nodes via a connectivity matrix.
@@ -164,7 +166,7 @@ For imperative use inside a composite model, prefer the class-based variants and
 
 
 
-Forward Models
+Forward models
 --------------
 
 Forward models map region-level neural observables or dipole moments to sensor space.
