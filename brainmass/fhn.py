@@ -16,6 +16,7 @@
 from typing import Callable
 
 import brainstate
+import braintools
 import brainunit as u
 
 from ._typing import Initializer
@@ -68,6 +69,10 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
     init_w : Callable, optional
         Initializer for the recovery state ``w``. Default is
         ``brainstate.init.Uniform(0, 0.05)``.
+    method: str
+        The integration method to use. Either 'exp_euler' for exponential
+        Euler (default) or any method supported by ``braintools.quad``, e.g.
+        'rk4', 'midpoint', 'heun', 'euler'.
 
     Attributes
     ----------
@@ -113,6 +118,7 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
         # other parameters
         init_V: Callable = brainstate.init.Uniform(0, 0.05),
         init_w: Callable = brainstate.init.Uniform(0, 0.05),
+        method: str = 'exp_euler',
     ):
         super().__init__(in_size=in_size)
 
@@ -133,6 +139,7 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
         self.init_w = init_w
         self.noise_V = noise_V
         self.noise_w = noise_w
+        self.method = method
 
     def init_state(self, batch_size=None, **kwargs):
         """Initialize model states ``V`` and ``w``.
@@ -197,6 +204,12 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
         """
         return (x - self.delta - self.epsilon * w) / self.tau + inp / u.ms
 
+    def derivative(self, state, t, V_inp, w_inp):
+        V, w = state
+        dVdt = self.dV(V, w, V_inp)
+        dwdt = self.dw(w, V, w_inp)
+        return (dVdt, dwdt)
+
     def update(self, V_inp=None, w_inp=None):
         """Advance the system by one time step.
 
@@ -226,9 +239,12 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
             V_inp = V_inp + self.noise_V()
         if self.noise_w is not None:
             w_inp = w_inp + self.noise_w()
-        V = brainstate.nn.exp_euler_step(self.dV, self.V.value, self.w.value, V_inp)
-        w = brainstate.nn.exp_euler_step(self.dw, self.w.value, self.V.value, w_inp)
+        if self.method == 'exp_euler':
+            V = brainstate.nn.exp_euler_step(self.dV, self.V.value, self.w.value, V_inp)
+            w = brainstate.nn.exp_euler_step(self.dw, self.w.value, self.V.value, w_inp)
+        else:
+            method = getattr(braintools.quad, f'ode_{self.method}_step')
+            V, w = method(self.derivative, (self.V.value, self.w.value), 0 * u.ms, V_inp, w_inp)
         self.V.value = V
         self.w.value = w
         return V
-
