@@ -33,6 +33,8 @@ class ArrayParam(brainstate.ParamState, u.CustomArray):
         value,
         transform: braintools.Transform = braintools.IdentityTransform()
     ):
+        if not isinstance(value, brainstate.typing.ArrayLike):
+            raise TypeError(f'value must be array-like, got {value}')
         value = transform.inverse(value)
         super().__init__(value)
         self.transform = transform
