@@ -74,14 +74,12 @@ class BrownianNoise(Noise):
         in_size: brainstate.typing.Size,
         mean: brainstate.typing.ArrayLike = None,
         sigma: brainstate.typing.ArrayLike = 1. * u.nA,
-        time_unit: u.Unit = u.ms,
         init: Callable = brainstate.init.ZeroInit(unit=u.nA)
     ):
         super().__init__(in_size=in_size)
 
         self.sigma = sigma
         self.mean = 0. * u.get_unit(sigma) if mean is None else mean
-        self.time_unit = time_unit
         self.init = init
 
     def init_state(self, batch_size=None, **kwargs):
@@ -91,9 +89,8 @@ class BrownianNoise(Noise):
         self.x.value = brainstate.init.param(self.init, self.varshape, batch_size)
 
     def update(self):
-        dt = brainstate.environ.get_dt() / self.time_unit
-        z = brainstate.random.normal(loc=0.0, scale=1.0, size=self.varshape)
-        self.x.value = self.x.value + self.sigma * u.math.sqrt(dt) * z
+        dt = brainstate.environ.get_dt() / u.ms
+        self.x.value = self.x.value + self.sigma * u.math.sqrt(dt) * brainstate.random.randn(*self.varshape)
         return self.mean + self.x.value
 
 
@@ -145,7 +142,6 @@ class ColoredNoise(Noise):
         # normalize std over last axis and scale
         std = jnp.std(y, axis=-1, keepdims=True)
         y = jnp.where(std > 0, y / std, y)
-        y = np.array(y)
         return self.mean + self.sigma * y
 
 
