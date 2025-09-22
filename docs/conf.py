@@ -43,6 +43,8 @@ release = brainmass.__version__
 
 import shutil
 shutil.copytree('../examples', './examples', dirs_exist_ok=True)
+shutil.copy('../changelog.md', './changelog.md')
+
 
 # -- General configuration ---------------------------------------------------
 

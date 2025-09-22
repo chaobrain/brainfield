@@ -14,117 +14,151 @@
 # ==============================================================================
 
 
-import brainscale
+from typing import Callable
+
 import brainstate
 import brainunit as u
-import jax.numpy as jnp
 
+from ._common import XY_Oscillator
+from ._typing import Initializer
 from .noise import Noise
 
 __all__ = [
-    'HopfModel',
+    'HopfOscillator',
 ]
 
 
-class HopfModel(brainstate.nn.Dynamics):
-    r"""
-    The adaptive linear-nonlinear (aln) cascade model is a low-dimensional 
-    population model of spiking neural networks. Mathematically, 
-    it is a dynamical system of non-linear ODEs. 
-    The dynamical variables of the system simulated in the aln model describe the average 
-    firing rate and other macroscopic variables of a randomly connected, 
-    delay-coupled network of excitatory and inhibitory adaptive exponential 
-    integrate-and-fire neurons (AdEx) with non-linear synaptic currents.
-    
-    .. math::
-    \frac{\mathrm{d}z}{\mathrm{d}t} = (a + \mathrm{i}\omega)\,z - \beta\,|z|^{2}z + I_{\text{ext}}(t)
-    with :math:`|z|^{2} = x^{2} + y^{2}`.  
-    Split into real/imaginary parts the system reads
+class HopfOscillator(XY_Oscillator):
+    r"""Normal-form Hopf oscillator (two-dimensional rate model).
+
+    This model implements the supercritical Hopf normal form for a single node
+    in terms of its real and imaginary components, often used as a simple
+    mesoscopic model of oscillatory neural population activity.
+
+    The complex form is
 
     .. math::
-    \begin{aligned}
-    \dot x &= (a - \beta\,r)\,x - \omega\,y + coupled_x + I_{x}(t) \\
-    \dot y &= (a - \beta\,r)\,y + \omega\,x + coupled_y + I_{y}(t)
-    \end{aligned}
-    \quad\text{with}\quad r = x^{2} + y^{2}.
+        \frac{dz}{dt} = (a + i\,\omega)\,z - \beta\,|z|^{2} z + I_{\text{ext}}(t),
+
+    where :math:`z = x + i y` and :math:`|z|^2 = x^2 + y^2`. In real variables:
+
+    .. math::
+        \begin{aligned}
+        \dot x &= (a - \beta r)\,x - \omega\,y + \text{coupled}_x + I_x(t),\\
+        \dot y &= (a - \beta r)\,y + \omega\,x + \text{coupled}_y + I_y(t), \\
+        r &= x^2 + y^2.
+        \end{aligned}
 
     Parameters
     ----------
-    x, y : dynamical variables
-    Real and imaginary components of the oscillator (firing-rate analogue).
-    a : bifurcation parameter
-    > 0  →  limit-cycle (oscillatory);  ≤ 0  →  stable focus (silent).
-    ω : angular frequency
-    Intrinsic oscillation frequency (rad s⁻¹).
-    β : nonlinear saturation coefficient
-    Sets the limit-cycle amplitude (√ a/β ).
-    K_gl : global coupling gain
-    Scales diffusive input from other nodes.
-    I_x, I_y : external inputs
-    Additive currents (noise, coupling, stimulus) acting on x and y.
-    coupled_x, coupled_y : coupling mechanism for neural network modules
- 
+    in_size : brainstate.typing.Size
+        Spatial shape of the node. Can be an int or tuple of ints.
+    a : Initializer, optional
+        Bifurcation parameter (dimensionless). For ``a > 0`` the system exhibits
+        a stable limit cycle; for ``a < 0`` the origin is a stable focus.
+        Broadcastable to ``in_size``. Default is ``0.25``.
+    w : Initializer, optional
+        Angular frequency :math:`\omega` (dimensionless in this implementation).
+        Broadcastable to ``in_size``. Default is ``0.2``.
+    K_gl : Initializer, optional
+        Global coupling gain (dimensionless), included for convenience when used
+        in networked settings. Not applied directly in the local node dynamics.
+        Broadcastable to ``in_size``. Default is ``1.0``.
+    beta : Initializer, optional
+        Nonlinear saturation coefficient (dimensionless) setting the limit-cycle
+        amplitude (approximately :math:`\sqrt{a/\beta}` when ``a>0``).
+        Broadcastable to ``in_size``. Default is ``1.0``.
+    noise_x : Noise or None, optional
+        Additive noise process to ``x``. If provided, called each step and added
+        to ``ext_x``. Default is ``None``.
+    noise_y : Noise or None, optional
+        Additive noise process to ``y``. If provided, called each step and added
+        to ``ext_y``. Default is ``None``.
+
+    Attributes
+    ----------
+    x : brainscale.ETraceState
+        State container for the real component ``x``.
+    y : brainscale.ETraceState
+        State container for the imaginary component ``y``.
+
+    Notes
+    -----
+    Time derivatives returned by ``dx`` and ``dy`` carry unit ``1/ms`` so that
+    an explicit (exponential) Euler integrator with time step ``dt`` having
+    unit ``ms`` evolves the state consistently with units.
     """
 
     def __init__(
         self,
         in_size: brainstate.typing.Size,
 
-        a: brainstate.typing.ArrayLike = 0.25,  # Hopf bifurcation parameter
-        w: brainstate.typing.ArrayLike = 0.2,  # Oscillator frequency
-        K_gl: brainstate.typing.ArrayLike = 1.0,  # global coupling strength
-        beta: brainstate.typing.ArrayLike = 1.0,  # nonlinear saturation coefficient
+        a: Initializer = 0.25,  # Hopf bifurcation parameter
+        w: Initializer = 0.2,  # Oscillator frequency
+        K_gl: Initializer = 1.0,  # global coupling strength
+        beta: Initializer = 1.0,  # nonlinear saturation coefficient
 
         # noise
         noise_x: Noise = None,
         noise_y: Noise = None,
 
+        # initialization
+        init_x: Callable = brainstate.init.ZeroInit(),
+        init_y: Callable = brainstate.init.ZeroInit(),
+        method: str = 'exp_euler',
     ):
-        super().__init__(in_size=in_size)
+        super().__init__(
+            in_size,
+            noise_x=noise_x,
+            noise_y=noise_y,
+            init_x=init_x,
+            init_y=init_y,
+            method=method,
+        )
 
         self.a = brainstate.init.param(a, self.varshape)
         self.w = brainstate.init.param(w, self.varshape)
         self.K_gl = brainstate.init.param(K_gl, self.varshape)
         self.beta = brainstate.init.param(beta, self.varshape)
-        self.noise_x = noise_x
-        self.noise_y = noise_y
-
-    def init_state(self, batch_size=None, **kwargs):
-        size = self.varshape if batch_size is None else (batch_size,) + self.varshape
-        self.x = brainscale.ETraceState(jnp.zeros(size))
-        self.y = brainscale.ETraceState(jnp.zeros(size))
-
-    def reset_state(self, batch_size=None, **kwargs):
-        size = self.varshape if batch_size is None else (batch_size,) + self.varshape
-        # initial values of the state variables
-        self.x.value = brainstate.init.param(jnp.zeros, size)
-        self.y.value = brainstate.init.param(jnp.zeros, size)
 
     def dx(self, x, y, inp):
+        """Right-hand side for ``x``.
+
+        Parameters
+        ----------
+        x : array-like
+            Current real component.
+        y : array-like
+            Current imaginary component (broadcastable to ``x``).
+        inp : array-like or scalar
+            External input to ``x`` (includes coupling and noise).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``dx/dt`` with unit ``1/ms``.
+        """
         r = x ** 2 + y ** 2
         dx_dt = (self.a - self.beta * r) * x - self.w * y + inp
         return dx_dt / u.ms
 
     def dy(self, y, x, inp):
+        """Right-hand side for ``y``.
+
+        Parameters
+        ----------
+        y : array-like
+            Current imaginary component.
+        x : array-like
+            Current real component (broadcastable to ``y``).
+        inp : array-like or scalar
+            External input to ``y`` (includes coupling and noise).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``dy/dt`` with unit ``1/ms``.
+        """
         r = x ** 2 + y ** 2
         dy_dt = (self.a - self.beta * r) * y + self.w * x + inp
         return dy_dt / u.ms
-
-    def update(self, coupled_x, coupled_y, ext_x=None, ext_y=None):
-        ext_x = 0. if ext_x is None else ext_x
-        ext_y = 0. if ext_y is None else ext_y
-
-        # add noise
-        if self.noise_x is not None:
-            assert isinstance(self.noise_y, Noise), "noise_y must be an Noise if noise_x is not None"
-            ext_x += self.noise_x()
-
-        if self.noise_y is not None:
-            assert isinstance(self.noise_x, Noise), "noise_x must be an v if noise_y is not None"
-            ext_y += self.noise_y()
-
-        x_next = brainstate.nn.exp_euler_step(self.dx, self.x.value, self.y.value, coupled_x + ext_x)
-        y_next = brainstate.nn.exp_euler_step(self.dy, self.y.value, self.x.value, coupled_y + ext_y)
-        self.x.value = x_next
-        self.y.value = y_next
-        return x_next, y_next

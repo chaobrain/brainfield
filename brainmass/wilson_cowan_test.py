@@ -234,7 +234,7 @@ class TestWilsonCowanModel:
         initial_rI = model.rI.value.copy()
 
         # Apply external input to ensure state change
-        result = model.update(rE_ext=2.0, rI_ext=1.0)
+        result = model.update(rE_inp=2.0, rI_inp=1.0)
 
         # State should have changed
         assert not u.math.allclose(model.rE.value, initial_rE)
@@ -248,10 +248,10 @@ class TestWilsonCowanModel:
         model.init_state()
 
         # Test with different external inputs
-        result1 = model.update(rE_ext=1.0, rI_ext=0.5)
+        result1 = model.update(rE_inp=1.0, rI_inp=0.5)
 
         model.reset_state()
-        result2 = model.update(rE_ext=2.0, rI_ext=1.0)
+        result2 = model.update(rE_inp=2.0, rI_inp=1.0)
 
         # Different inputs should produce different outputs
         assert not u.math.allclose(result1, result2)
@@ -308,7 +308,7 @@ class TestWilsonCowanModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(rE_ext=3.0)
+                return model.update(rE_inp=3.0)
 
         # Run simulation
         n_steps = 5000
@@ -332,7 +332,7 @@ class TestWilsonCowanModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(rE_ext=1.0, rI_ext=0.5)
+                return model.update(rE_inp=1.0, rI_inp=0.5)
 
         # Run simulation
         n_steps = 2000
@@ -352,7 +352,7 @@ class TestWilsonCowanModel:
         model = brainmass.WilsonCowanModel(3)
         model.init_state(batch_size=batch_size)
 
-        result = model.update(rE_ext=1.0, rI_ext=0.5)
+        result = model.update(rE_inp=1.0, rI_inp=0.5)
 
         assert result.shape == (batch_size, 3)
 
@@ -382,7 +382,7 @@ class TestWilsonCowanModel:
         )
         model.init_state()
 
-        result = model.update(rE_ext=1.0, rI_ext=0.5)
+        result = model.update(rE_inp=1.0, rI_inp=0.5)
 
         assert result.shape == (3,)
 
@@ -395,7 +395,7 @@ class TestWilsonCowanModel:
 
         def step_run(i):
             with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                return model.update(rE_ext=2.0, rI_ext=1.0)
+                return model.update(rE_inp=2.0, rI_inp=1.0)
 
         # Long simulation
         n_steps = 10000
@@ -421,7 +421,7 @@ class TestWilsonCowanModel:
         def run_model(model):
             def step_run(i):
                 with brainstate.environ.context(i=i, t=i * brainstate.environ.get_dt()):
-                    return model.update(rE_ext=2.0)
+                    return model.update(rE_inp=2.0)
 
             return brainstate.transform.for_loop(step_run, np.arange(1000))
 
@@ -469,7 +469,7 @@ class TestWilsonCowanIntegration:
                 for j, model in enumerate(models):
                     coupling_val = coupling_inputs[j]
                     # JAX will handle the broadcasting automatically
-                    result = model.update(rE_ext=1.0 + coupling_val)
+                    result = model.update(rE_inp=1.0 + coupling_val)
                     results.append(result)
 
                 return jnp.stack(results)
@@ -493,7 +493,7 @@ class TestWilsonCowanIntegration:
                 # Sinusoidal input
                 t = i * 0.1  # time in ms
                 stimulus = 2.0 + 1.0 * jnp.sin(2 * jnp.pi * t / 100.0)  # 10 Hz oscillation
-                return model.update(rE_ext=stimulus)
+                return model.update(rE_inp=stimulus)
 
         # Run simulation
         n_steps = 2000

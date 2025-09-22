@@ -19,22 +19,32 @@ __version__ = "0.0.4"
 
 from .coupling import *
 from .coupling import __all__ as coupling_all
+from .fhn import *
+from .fhn import __all__ as fhn_all
 from .forward_model import *
 from .forward_model import __all__ as forward_model_all
 from .hopf import *
 from .hopf import __all__ as hopf_all
 from .jansen_rit import *
 from .jansen_rit import __all__ as jansen_rit_all
+from .kuramoto import *
+from .kuramoto import __all__ as kuramoto_all
+from .linear import *
+from .linear import __all__ as linear_all
 from .noise import *
 from .noise import __all__ as noise_all
 from .param import *
 from .param import __all__ as param_all
+from .qif import *
+from .qif import __all__ as qif_all
+from .vdp import *
+from .vdp import __all__ as vdp_all
 from .wilson_cowan import *
 from .wilson_cowan import __all__ as wilson_cowan_all
 from .wong_wang import *
 from .wong_wang import __all__ as wong_wang_all
 
 __all__ = forward_model_all + coupling_all + jansen_rit_all + noise_all + wilson_cowan_all + wong_wang_all + hopf_all
-__all__ = __all__ + param_all
+__all__ = __all__ + param_all + fhn_all + linear_all + vdp_all + kuramoto_all + qif_all
 del forward_model_all, coupling_all, jansen_rit_all, noise_all, wilson_cowan_all, wong_wang_all, hopf_all
-del param_all
+del param_all, fhn_all, linear_all, vdp_all, kuramoto_all, qif_all

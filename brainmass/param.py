@@ -30,7 +30,7 @@ class ArrayParam(brainstate.ParamState, u.CustomArray):
 
     def __init__(
         self,
-        value,
+        value: brainstate.typing.ArrayLike,
         transform: braintools.Transform = braintools.IdentityTransform()
     ):
         if not isinstance(value, brainstate.typing.ArrayLike):

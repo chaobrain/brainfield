@@ -21,6 +21,7 @@ import brainunit as u
 from brainstate.nn import exp_euler_step
 
 from .noise import Noise
+from ._typing import Initializer
 
 __all__ = [
     'JansenRitModel',
@@ -183,18 +184,18 @@ class JansenRitModel(brainstate.nn.Dynamics):
     def __init__(
         self,
         in_size: brainstate.typing.Size,
-        Ae: Union[brainstate.typing.ArrayLike, Callable] = 3.25 * u.mV,  # Excitatory gain
-        Ai: Union[brainstate.typing.ArrayLike, Callable] = 22. * u.mV,  # Inhibitory gain
-        be: Union[brainstate.typing.ArrayLike, Callable] = 100. * u.Hz,  # Excit. time const
-        bi: Union[brainstate.typing.ArrayLike, Callable] = 50. * u.Hz,  # Inhib. time const.
-        C: Union[brainstate.typing.ArrayLike, Callable] = 135.,  # Connect. const.
-        a1: Union[brainstate.typing.ArrayLike, Callable] = 1.,  # Connect. param.
-        a2: Union[brainstate.typing.ArrayLike, Callable] = 0.8,  # Connect. param.
-        a3: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param
-        a4: Union[brainstate.typing.ArrayLike, Callable] = 0.25,  # Connect. param.
-        s_max: Union[brainstate.typing.ArrayLike, Callable] = 5.0 * u.Hz,  # Max firing rate
-        v0: Union[brainstate.typing.ArrayLike, Callable] = 6. * u.mV,  # Firing threshold
-        r: Union[brainstate.typing.ArrayLike, Callable] = 0.56,  # Sigmoid steepness
+        Ae: Initializer = 3.25 * u.mV,  # Excitatory gain
+        Ai: Initializer = 22. * u.mV,  # Inhibitory gain
+        be: Initializer = 100. * u.Hz,  # Excit. time const
+        bi: Initializer = 50. * u.Hz,  # Inhib. time const.
+        C: Initializer = 135.,  # Connect. const.
+        a1: Initializer = 1.,  # Connect. param.
+        a2: Initializer = 0.8,  # Connect. param.
+        a3: Initializer = 0.25,  # Connect. param
+        a4: Initializer = 0.25,  # Connect. param.
+        s_max: Initializer = 5.0 * u.Hz,  # Max firing rate
+        v0: Initializer = 6. * u.mV,  # Firing threshold
+        r: Initializer = 0.56,  # Sigmoid steepness
         M_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
         E_init: Callable = brainstate.init.ZeroInit(unit=u.mV),
         I_init: Callable = brainstate.init.ZeroInit(unit=u.mV),

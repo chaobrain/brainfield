@@ -16,9 +16,11 @@
 from typing import Callable
 
 import brainstate
+import braintools
 import brainunit as u
 import jax.numpy as jnp
 
+from ._typing import Initializer
 from .noise import Noise
 
 __all__ = [
@@ -39,51 +41,56 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
     in_size : brainstate.typing.Size
         Spatial shape of each population (E and I). Can be an int, a tuple of
         ints, or any size compatible with ``brainstate``.
-    tau_E : brainstate.typing.ArrayLike, optional
+    tau_E : Initializer, optional
         Excitatory time constant with unit of time (e.g., ``1. * u.ms``).
         Broadcastable to ``in_size``. Default is ``1. * u.ms``.
-    a_E : brainstate.typing.ArrayLike, optional
+    a_E : Initializer, optional
         Excitatory gain (dimensionless). Broadcastable to ``in_size``.
         Default is ``1.2``.
-    theta_E : brainstate.typing.ArrayLike, optional
+    theta_E : Initializer, optional
         Excitatory threshold (dimensionless). Broadcastable to ``in_size``.
         Default is ``2.8``.
-    tau_I : brainstate.typing.ArrayLike, optional
+    tau_I : Initializer, optional
         Inhibitory time constant with unit of time (e.g., ``1. * u.ms``).
         Broadcastable to ``in_size``. Default is ``1. * u.ms``.
-    a_I : brainstate.typing.ArrayLike, optional
+    a_I : Initializer, optional
         Inhibitory gain (dimensionless). Broadcastable to ``in_size``.
         Default is ``1.``.
-    theta_I : brainstate.typing.ArrayLike, optional
+    theta_I : Initializer, optional
         Inhibitory threshold (dimensionless). Broadcastable to ``in_size``.
         Default is ``4.0``.
-    wEE : brainstate.typing.ArrayLike, optional
+    wEE : Initializer, optional
         E→E coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``12.``.
-    wIE : brainstate.typing.ArrayLike, optional
+    wIE : Initializer, optional
         E→I coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``4.``.
-    wEI : brainstate.typing.ArrayLike, optional
+    wEI : Initializer, optional
         I→E coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``13.``.
-    wII : brainstate.typing.ArrayLike, optional
+    wII : Initializer, optional
         I→I coupling strength (dimensionless). Broadcastable to ``in_size``.
         Default is ``11.``.
-    r : brainstate.typing.ArrayLike, optional
+    r : Initializer, optional
         Refractory parameter (dimensionless) that limits maximum activation.
         Broadcastable to ``in_size``. Default is ``1.``.
     noise_E : Noise or None, optional
         Additive noise process for the excitatory population. If provided, its
-        output is added to ``rE_ext`` at each update. Default is ``None``.
+        output is added to ``rE_inp`` at each update. Default is ``None``.
     noise_I : Noise or None, optional
         Additive noise process for the inhibitory population. If provided, its
-        output is added to ``rI_ext`` at each update. Default is ``None``.
+        output is added to ``rI_inp`` at each update. Default is ``None``.
     rE_init : Callable, optional
         Initializer for the excitatory state ``rE``. Default is
         ``brainstate.init.ZeroInit()``.
     rI_init : Callable, optional
         Initializer for the inhibitory state ``rI``. Default is
         ``brainstate.init.ZeroInit()``.
+    method: str
+        The numerical integration method to use. One of ``'exp_euler'``,
+        ``'euler'``, ``'rk2'``, or ``'rk4'``, that is implemented in
+        ``braintools.quad``. Default is ``'exp_euler'``.
+
 
     Attributes
     ----------
@@ -125,23 +132,23 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         in_size: brainstate.typing.Size,
 
         # Excitatory parameters
-        tau_E: brainstate.typing.ArrayLike = 1. * u.ms,  # excitatory time constant (ms)
-        a_E: brainstate.typing.ArrayLike = 1.2,  # excitatory gain (dimensionless)
-        theta_E: brainstate.typing.ArrayLike = 2.8,  # excitatory firing threshold (dimensionless)
+        tau_E: Initializer = 1. * u.ms,  # excitatory time constant (ms)
+        a_E: Initializer = 1.2,  # excitatory gain (dimensionless)
+        theta_E: Initializer = 2.8,  # excitatory firing threshold (dimensionless)
 
         # Inhibitory parameters
-        tau_I: brainstate.typing.ArrayLike = 1. * u.ms,  # inhibitory time constant (ms)
-        a_I: brainstate.typing.ArrayLike = 1.,  # inhibitory gain (dimensionless)
-        theta_I: brainstate.typing.ArrayLike = 4.0,  # inhibitory firing threshold (dimensionless)
+        tau_I: Initializer = 1. * u.ms,  # inhibitory time constant (ms)
+        a_I: Initializer = 1.,  # inhibitory gain (dimensionless)
+        theta_I: Initializer = 4.0,  # inhibitory firing threshold (dimensionless)
 
         # Connection parameters
-        wEE: brainstate.typing.ArrayLike = 12.,  # local E-E coupling (dimensionless)
-        wIE: brainstate.typing.ArrayLike = 4.,  # local E-I coupling (dimensionless)
-        wEI: brainstate.typing.ArrayLike = 13.,  # local I-E coupling (dimensionless)
-        wII: brainstate.typing.ArrayLike = 11.,  # local I-I coupling (dimensionless)
+        wEE: Initializer = 12.,  # local E-E coupling (dimensionless)
+        wIE: Initializer = 4.,  # local E-I coupling (dimensionless)
+        wEI: Initializer = 13.,  # local I-E coupling (dimensionless)
+        wII: Initializer = 11.,  # local I-I coupling (dimensionless)
 
         # Refractory parameter
-        r: brainstate.typing.ArrayLike = 1.,  # refractory parameter (dimensionless)
+        r: Initializer = 1.,  # refractory parameter (dimensionless)
 
         # noise
         noise_E: Noise = None,  # excitatory noise process
@@ -150,6 +157,7 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         # initialization
         rE_init: Callable = brainstate.init.ZeroInit(),
         rI_init: Callable = brainstate.init.ZeroInit(),
+        method: str = 'exp_euler',
     ):
         super().__init__(in_size=in_size)
 
@@ -170,6 +178,7 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         assert isinstance(noise_E, Noise) or noise_E is None, "noise_E must be an OUProcess or None"
         self.rE_init = rE_init
         self.rI_init = rI_init
+        self.method = method
 
     def init_state(self, batch_size=None, **kwargs):
         self.rE = brainstate.HiddenState(brainstate.init.param(self.rE_init, self.varshape, batch_size))
@@ -239,15 +248,21 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         xx = self.wEI * rE - self.wII * rI + ext
         return (-rI + (1 - self.r * rI) * self.F(xx, self.a_I, self.theta_I)) / self.tau_I
 
-    def update(self, rE_ext=None, rI_ext=None):
+    def derivaitive(self, state, t, E_exp, I_exp):
+        rE, rI = state
+        drE_dt = self.drE(rE, rI, E_exp)
+        drI_dt = self.drI(rI, rE, I_exp)
+        return (drE_dt, drI_dt)
+
+    def update(self, rE_inp=None, rI_inp=None):
         """Advance the system by one time step.
 
         Parameters
         ----------
-        rE_ext : array-like or scalar or None, optional
+        rE_inp : array-like or scalar or None, optional
             External input to the excitatory population. If ``None``, treated
             as zero. If ``noise_E`` is set, its output is added.
-        rI_ext : array-like or scalar or None, optional
+        rI_inp : array-like or scalar or None, optional
             External input to the inhibitory population. If ``None``, treated
             as zero. If ``noise_I`` is set, its output is added.
 
@@ -264,21 +279,28 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         internal states ``rE`` and ``rI`` in-place.
         """
         # excitatory input
-        rE_ext = 0. if rE_ext is None else rE_ext
-        rI_ext = 0. if rI_ext is None else rI_ext
+        rE_inp = 0. if rE_inp is None else rE_inp
+        rI_inp = 0. if rI_inp is None else rI_inp
         if self.noise_E is not None:
-            rE_ext = rE_ext + self.noise_E()
-        rE_ext = self.sum_delta_inputs(rE_ext, label='E')
+            rE_inp = rE_inp + self.noise_E()
+        rE_inp = self.sum_delta_inputs(rE_inp, label='E')
 
         # inhibitory input
         if self.noise_I is not None:
-            rI_ext = rI_ext + self.noise_I()
-        rI_ext = self.sum_delta_inputs(rI_ext, label='I')
+            rI_inp = rI_inp + self.noise_I()
+        rI_inp = self.sum_delta_inputs(rI_inp, label='I')
 
         # update the state variables
-        rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_ext)
-        rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_ext)
+        if self.method == 'exp_euler':
+            rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_inp)
+            rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_inp)
+        else:
+            rE, rI = getattr(braintools.quad, f'ode_{self.method}_step')(
+                (self.rE.value, self.rI.value),
+                0. * u.ms,
+                rE_inp,
+                rI_inp,
+            )
         self.rE.value = rE
         self.rI.value = rI
         return rE
-

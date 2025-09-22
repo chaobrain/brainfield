@@ -79,7 +79,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import brainmass
 import braintools
 import matplotlib.pyplot as plt
-
 #%%
 class Scale:
     """Smoothly saturating scaling nonlinearity with unit support.
@@ -102,41 +101,6 @@ class Scale:
     def __call__(self, x):
         x, unit = u.split_mantissa_unit(x)
         return u.maybe_decimal(self.slope * self.fn(x / self.slope) * unit)
-
-
-#%%
-class Parameter(brainstate.ParamState, u.CustomArray):
-    """Trainable parameter wrapper with bijective transform and unit support.
-
-    This wraps a raw parameter `value` with an optional `Transform` from
-    `braintools` (e.g., `SoftplusTransform`, `SigmoidTransform`) to ensure that
-    the parameter respects constraints (positivity, bounded range, etc.).
-
-    The `value` stored internally is in the transform's inverse space for
-    numerically stable optimization. The public `data` property applies the
-    forward transform, exposing the constrained value where appropriate.
-
-    Examples
-    --------
-    - Positive-only parameter: `Parameter(1.0 * u.Hz, SoftplusTransform(1e-3*u.Hz))`
-    - Bounded parameter: `Parameter(0.8, SigmoidTransform(lo=0.4, hi=1.2))`
-    """
-    def __init__(
-        self,
-        value,
-        transform: braintools.Transform = braintools.IdentityTransform()
-    ):
-        value = transform.inverse(value)
-        super().__init__(value)
-        self.transform = transform
-
-    @property
-    def data(self):
-        return self.transform(self.value)
-
-    # @data.setter
-    # def data(self, v):
-    #     self.value = self.transform.inverse(v)
 
 
 #%%
@@ -614,41 +578,41 @@ def train_one_subject(sub_index):
 
     net = Network(
         sc=sc,
-        w_bb=Parameter(sc + 0.05),
+        w_bb=brainmass.ArrayParam(sc + 0.05),
         dist=dist,
-        lm=Parameter(lm),
-        lm_shift=Parameter(np.random.normal(2.0, 0.5, output_size) * u.mV),
+        lm=brainmass.ArrayParam(lm),
+        lm_shift=brainmass.ArrayParam(np.random.normal(2.0, 0.5, output_size) * u.mV),
 
-        # Ae=Parameter(3.25 * u.mV, braintools.SigmoidTransform(2 * u.mV, 10 * u.mV)),
-        # Ai=Parameter(22. * u.mV, braintools.SigmoidTransform(17.0 * u.mV, 110 * u.mV)),
-        # be=Parameter(100. * u.Hz, braintools.SigmoidTransform(5.0 * u.Hz, 150. * u.Hz)),
-        # bi=Parameter(50. * u.Hz, braintools.SigmoidTransform(25.0 * u.Hz, 75 * u.Hz)),
-        # a1=Parameter(1.0, braintools.SigmoidTransform(0.5, 1.5)),
-        # a2=Parameter(0.8, braintools.SigmoidTransform(0.4, 1.2)),
-        # a3=Parameter(0.25, braintools.SigmoidTransform(0.125, 0.375)),
-        # a4=Parameter(0.25, braintools.SigmoidTransform(0.125, 0.375)),
-        # gc=Parameter(1e3, braintools.SigmoidTransform(10, 2e3)),
+        # Ae=brainmass.ArrayParam(3.25 * u.mV, braintools.SigmoidTransform(2 * u.mV, 10 * u.mV)),
+        # Ai=brainmass.ArrayParam(22. * u.mV, braintools.SigmoidTransform(17.0 * u.mV, 110 * u.mV)),
+        # be=brainmass.ArrayParam(100. * u.Hz, braintools.SigmoidTransform(5.0 * u.Hz, 150. * u.Hz)),
+        # bi=brainmass.ArrayParam(50. * u.Hz, braintools.SigmoidTransform(25.0 * u.Hz, 75 * u.Hz)),
+        # a1=brainmass.ArrayParam(1.0, braintools.SigmoidTransform(0.5, 1.5)),
+        # a2=brainmass.ArrayParam(0.8, braintools.SigmoidTransform(0.4, 1.2)),
+        # a3=brainmass.ArrayParam(0.25, braintools.SigmoidTransform(0.125, 0.375)),
+        # a4=brainmass.ArrayParam(0.25, braintools.SigmoidTransform(0.125, 0.375)),
+        # gc=brainmass.ArrayParam(1e3, braintools.SigmoidTransform(10, 2e3)),
 
-        Ae=Parameter(3.25 * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
-        Ai=Parameter(22. * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
-        be=Parameter(100. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
-        bi=Parameter(50. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
-        a1=Parameter(1.0, braintools.SoftplusTransform(0.01)),
-        a2=Parameter(0.8, braintools.SoftplusTransform(0.01)),
-        a3=Parameter(0.25, braintools.SoftplusTransform(0.01)),
-        a4=Parameter(0.25, braintools.SoftplusTransform(0.01)),
-        gc=Parameter(1e3, braintools.SoftplusTransform(1e2)),
-        std_in=Parameter(10 * u.Hz, braintools.SoftplusTransform(0.0 * u.Hz)),
+        Ae=brainmass.ArrayParam(3.25 * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
+        Ai=brainmass.ArrayParam(22. * u.mV, braintools.SoftplusTransform(1.0 * u.mV)),
+        be=brainmass.ArrayParam(100. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
+        bi=brainmass.ArrayParam(50. * u.Hz, braintools.SoftplusTransform(1.0 * u.Hz)),
+        a1=brainmass.ArrayParam(1.0, braintools.SoftplusTransform(0.01)),
+        a2=brainmass.ArrayParam(0.8, braintools.SoftplusTransform(0.01)),
+        a3=brainmass.ArrayParam(0.25, braintools.SoftplusTransform(0.01)),
+        a4=brainmass.ArrayParam(0.25, braintools.SoftplusTransform(0.01)),
+        gc=brainmass.ArrayParam(1e3, braintools.SoftplusTransform(1e2)),
+        std_in=brainmass.ArrayParam(10 * u.Hz, braintools.SoftplusTransform(0.0 * u.Hz)),
 
-        # Ae=Parameter(3.25 * u.mV),
-        # Ai=Parameter(22. * u.mV),
-        # be=Parameter(100. * u.Hz),
-        # bi=Parameter(50. * u.Hz),
-        # a1=Parameter(1.0),
-        # a2=Parameter(0.8),
-        # a3=Parameter(0.25),
-        # a4=Parameter(0.25),
-        # gc=Parameter(1e3),
+        # Ae=brainmass.ArrayParam(3.25 * u.mV),
+        # Ai=brainmass.ArrayParam(22. * u.mV),
+        # be=brainmass.ArrayParam(100. * u.Hz),
+        # bi=brainmass.ArrayParam(50. * u.Hz),
+        # a1=brainmass.ArrayParam(1.0),
+        # a2=brainmass.ArrayParam(0.8),
+        # a3=brainmass.ArrayParam(0.25),
+        # a4=brainmass.ArrayParam(0.25),
+        # gc=brainmass.ArrayParam(1e3),
 
         s_max=5.0 * u.Hz,
         v0=6.0 * u.mV,

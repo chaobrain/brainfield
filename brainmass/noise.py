@@ -19,7 +19,8 @@ from typing import Callable
 import brainstate
 import brainunit as u
 import jax.numpy as jnp
-import numpy as np
+
+from ._typing import Initializer
 
 __all__ = [
     'Noise',
@@ -44,8 +45,8 @@ class GaussianNoise(Noise):
     def __init__(
         self,
         in_size: brainstate.typing.Size,
-        mean: brainstate.typing.ArrayLike = None,
-        sigma: brainstate.typing.ArrayLike = 1. * u.nA,
+        mean: Initializer = None,
+        sigma: Initializer = 1. * u.nA,
     ):
         super().__init__(in_size=in_size)
 
@@ -72,8 +73,8 @@ class BrownianNoise(Noise):
     def __init__(
         self,
         in_size: brainstate.typing.Size,
-        mean: brainstate.typing.ArrayLike = None,
-        sigma: brainstate.typing.ArrayLike = 1. * u.nA,
+        mean: Initializer = None,
+        sigma: Initializer = 1. * u.nA,
         init: Callable = brainstate.init.ZeroInit(unit=u.nA)
     ):
         super().__init__(in_size=in_size)
@@ -89,8 +90,9 @@ class BrownianNoise(Noise):
         self.x.value = brainstate.init.param(self.init, self.varshape, batch_size)
 
     def update(self):
-        dt = brainstate.environ.get_dt() / u.ms
-        self.x.value = self.x.value + self.sigma * u.math.sqrt(dt) * brainstate.random.randn(*self.varshape)
+        noise = brainstate.random.randn(*self.varshape)
+        dt_sqrt = u.math.sqrt(brainstate.environ.get_dt())
+        self.x.value = self.x.value + self.sigma / dt_sqrt * dt_sqrt * noise
         return self.mean + self.x.value
 
 
@@ -106,8 +108,8 @@ class ColoredNoise(Noise):
         self,
         in_size: brainstate.typing.Size,
         beta: float = 1.0,
-        mean: brainstate.typing.ArrayLike = None,
-        sigma: brainstate.typing.ArrayLike = 1. * u.nA,
+        mean: Initializer = None,
+        sigma: Initializer = 1. * u.nA,
     ):
         super().__init__(in_size=in_size)
 
@@ -201,9 +203,9 @@ class OUProcess(Noise):
     def __init__(
         self,
         in_size: brainstate.typing.Size,
-        mean: brainstate.typing.ArrayLike = None,  # noise mean value
-        sigma: brainstate.typing.ArrayLike = 1. * u.nA,  # noise amplitude
-        tau: brainstate.typing.ArrayLike = 10. * u.ms,  # time constant
+        mean: Initializer = None,  # noise mean value
+        sigma: Initializer = 1. * u.nA,  # noise amplitude
+        tau: Initializer = 10. * u.ms,  # time constant
         init: Callable = None
     ):
         super().__init__(in_size=in_size)

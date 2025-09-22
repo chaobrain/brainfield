@@ -19,6 +19,7 @@ import jax.numpy as jnp
 
 import brainstate
 from .noise import Noise
+from ._typing import Initializer
 
 __all__ = [
     'WongWangModel',
@@ -86,6 +87,7 @@ class WongWangModel(brainstate.nn.Dynamics):
         - $\mu_0$ = 30 Hz : Baseline external input rate
         - $c \in [-1, 1]$ : Motion coherence (stimulus strength)
 
+
     Network Behavior
     ================
     
@@ -94,7 +96,7 @@ class WongWangModel(brainstate.nn.Dynamics):
     1. **Spontaneous State**: At c=0 (no coherence), both populations have equal 
        activity, representing uncertainty.
        
-    2. **Decision State**: For |c| > 0, one population gradually wins the competition,
+    2. **Decision State**: For $|c| > 0$, one population gradually wins the competition,
        representing a perceptual choice.
        
     3. **Bistability**: The network can exhibit bistable attractor dynamics where
@@ -102,6 +104,7 @@ class WongWangModel(brainstate.nn.Dynamics):
        
     4. **Integration Time**: The slow NMDA dynamics ($\tau_S$ = 100ms) enable temporal
        integration of sensory evidence over hundreds of milliseconds.
+
 
     Usage Example
     =============
@@ -127,23 +130,23 @@ class WongWangModel(brainstate.nn.Dynamics):
         in_size: brainstate.typing.Size,
 
         # NMDA synaptic parameters
-        tau_S: brainstate.typing.ArrayLike = 0.1 * u.second,  # NMDA time constant (ms)
-        gamma: brainstate.typing.ArrayLike = 0.641,  # saturation factor
+        tau_S: Initializer = 0.1 * u.second,  # NMDA time constant (ms)
+        gamma: Initializer = 0.641,  # saturation factor
 
         # Input-output function parameters  
-        a: brainstate.typing.ArrayLike = 270. * (u.Hz / u.nA),  # gain (Hz/nA)
-        theta: brainstate.typing.ArrayLike = 0.31 * u.nA,  # firing threshold (nA)
+        a: Initializer = 270. * (u.Hz / u.nA),  # gain (Hz/nA)
+        theta: Initializer = 0.31 * u.nA,  # firing threshold (nA)
 
         # Network connectivity (nA)
-        J_N11: brainstate.typing.ArrayLike = 0.2609 * u.nA,  # self-excitation pop 1
-        J_N22: brainstate.typing.ArrayLike = 0.2609 * u.nA,  # self-excitation pop 2
-        J_N12: brainstate.typing.ArrayLike = 0.0497 * u.nA,  # cross-inhibition 2->1
-        J_N21: brainstate.typing.ArrayLike = 0.0497 * u.nA,  # cross-inhibition 2->1
-        J_A_ext: brainstate.typing.ArrayLike = 0.0002243 * (u.nA / u.Hz),  # external input strength (nA·Hz⁻¹)
+        J_N11: Initializer = 0.2609 * u.nA,  # self-excitation pop 1
+        J_N22: Initializer = 0.2609 * u.nA,  # self-excitation pop 2
+        J_N12: Initializer = 0.0497 * u.nA,  # cross-inhibition 2->1
+        J_N21: Initializer = 0.0497 * u.nA,  # cross-inhibition 2->1
+        J_A_ext: Initializer = 0.0002243 * (u.nA / u.Hz),  # external input strength (nA·Hz⁻¹)
 
         # External input
-        mu_0: brainstate.typing.ArrayLike = 30. * u.Hz,  # baseline input rate (Hz)
-        I_0: brainstate.typing.ArrayLike = 0.3255 * u.nA,  # background input current (nA)
+        mu_0: Initializer = 30. * u.Hz,  # baseline input rate (Hz)
+        I_0: Initializer = 0.3255 * u.nA,  # background input current (nA)
 
         # Noise processes
         noise_s1: Noise = None,
