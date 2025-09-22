@@ -111,10 +111,10 @@ class ThresholdLinearModel(brainstate.nn.Dynamics):
         super().__init__(in_size)
 
         # parameters
-        self.tau_e = brainstate.init.param(tau_E, self.varshape)
-        self.tau_i = brainstate.init.param(tau_I, self.varshape)
-        self.beta_e = brainstate.init.param(beta_E, self.varshape)
-        self.beta_i = brainstate.init.param(beta_I, self.varshape)
+        self.tau_E = brainstate.init.param(tau_E, self.varshape)
+        self.tau_I = brainstate.init.param(tau_I, self.varshape)
+        self.beta_E = brainstate.init.param(beta_E, self.varshape)
+        self.beta_I = brainstate.init.param(beta_I, self.varshape)
 
         # initializers and noise processes
         assert callable(init_E), "init_E must be a callable function"
@@ -180,11 +180,11 @@ class ThresholdLinearModel(brainstate.nn.Dynamics):
         if self.noise_I is not None:
             I_inp = I_inp + self.noise_I()
 
-        dE = lambda E: (-E + self.beta_e * u.math.maximum(E_inp, 0.)) / self.tau_e
+        dE = lambda E: (-E + self.beta_E * u.math.maximum(E_inp, 0.)) / self.tau_E
         E = brainstate.nn.exp_euler_step(dE, self.E.value)
         self.E.value = u.math.maximum(E, 0.)
 
-        dI = lambda I: (I - self.beta_i * u.math.maximum(I_inp, 0.)) / self.tau_i
+        dI = lambda I: (I - self.beta_I * u.math.maximum(I_inp, 0.)) / self.tau_I
         I = brainstate.nn.exp_euler_step(dI, self.I.value)
         self.I.value = u.math.maximum(I, 0.)
         return self.E.value

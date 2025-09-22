@@ -79,8 +79,7 @@ Example (Wilson–Cowan):
 
    wc = brainmass.WilsonCowanModel(in_size=(10,))  # 10 regions
    wc.init_state()
-   for _ in range(100):
-       rE = wc.update(rE_ext=0.2, rI_ext=0.1)  # add external drive
+   brainstate.transform.for_loop(lambda i: wc.update(rE_inp=0.2, rI_inp=0.1), jnp.arange(100))  # simulate 100 steps
 
 .. autosummary::
    :toctree: generated/

@@ -133,8 +133,8 @@ class FitzHughNagumoModel(brainstate.nn.Dynamics):
         # initializers
         assert isinstance(noise_V, Noise) or noise_V is None, "noise_V must be a Noise instance or None."
         assert isinstance(noise_w, Noise) or noise_w is None, "noise_w must be a Noise instance or None."
-        assert callable(noise_V), "noise_V must be a callable."
-        assert callable(noise_w), "noise_w must be a callable."
+        assert callable(init_V), "init_V must be a callable."
+        assert callable(init_w), "init_w must be a callable."
         self.init_V = init_V
         self.init_w = init_w
         self.noise_V = noise_V

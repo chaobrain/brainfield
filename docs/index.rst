@@ -85,11 +85,13 @@ We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs
    :maxdepth: 2
    :caption: Examples
 
-   examples/wilsonwowan-osillator.ipynb
-   examples/parameter-exploration.ipynb
-   examples/momi2023.ipynb
-   examples/jansenrit_single_node_simulation.ipynb
-   examples/hopf-osillator.ipynb
+   examples/00-hopf-osillator.ipynb
+   examples/01-wilsonwowan-osillator.ipynb
+   examples/02-fhn-osillator.ipynb
+   examples/03-jansenrit_single_node_simulation.ipynb
+   examples/10-parameter-exploration.ipynb
+   examples/11-nevergrad-optimization.ipynb
+   examples/12-scipy-optimization.ipynb
    examples/Modeling_resting_state_MEG_data.ipynb
 
 
@@ -98,6 +100,6 @@ We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs
    :maxdepth: 2
    :caption: API Reference
 
-   ../changelog.md
+   changelog.md
    api.rst
 
