@@ -90,6 +90,7 @@ We are building the `brain modeling ecosystem <https://brainmodeling.readthedocs
    examples/02-fhn-osillator.ipynb
    examples/03-jansenrit_single_node_simulation.ipynb
    examples/10-parameter-exploration.ipynb
+   examples/11-nevergrad-optimization.ipynb
    examples/momi2023.ipynb
    examples/Modeling_resting_state_MEG_data.ipynb
 
