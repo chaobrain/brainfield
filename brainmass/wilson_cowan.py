@@ -27,52 +27,97 @@ __all__ = [
 
 
 class WilsonCowanModel(brainstate.nn.Dynamics):
-    r"""
-    Wilson-Cowan neural mass model for excitatory-inhibitory population dynamics.
-    
-    This model describes the dynamics of two interacting neural populations 
-    (excitatory and inhibitory) and is fundamental for understanding neural 
-    oscillations, bistability, and other emergent network behaviors in cortical circuits.
+    r"""Wilson–Cowan neural mass model.
 
-    Mathematical Description:
-    ========================
-    
-    The model is governed by two coupled differential equations:
-    
-    .. math::
-        \tau_E \frac{da_E}{dt} = -a_E(t) + [1 - r \cdot a_E(t)] F_E(w_{EE} a_E(t) - w_{EI} a_I(t) + I_E(t))
-        
-    .. math::
-        \tau_I \frac{da_I}{dt} = -a_I(t) + [1 - r \cdot a_I(t)] F_I(w_{IE} a_E(t) - w_{II} a_I(t) + I_I(t))
-    
-    where the sigmoidal transfer function is:
-    
-    .. math::
-        F_j(x) = \frac{1}{1 + e^{-a_j(x - \theta_j)}} - \frac{1}{1 + e^{a_j \theta_j}}, \quad j \in \{E, I\}
+    The model captures the interaction between an excitatory (E) and an
+    inhibitory (I) neural population. It is widely used to study neural
+    oscillations, multistability, and other emergent dynamics in cortical
+    circuits.
 
     Parameters
-    ==========
-    - **tau_E, tau_I** (ms): Time constants controlling the response speed of excitatory 
-      and inhibitory populations
-    - **a_E, a_I** (dimensionless): Gain parameters controlling the steepness of the 
-      activation functions
-    - **theta_E, theta_I** (dimensionless): Threshold parameters for population activation
-    - **wEE** (dimensionless): Excitatory-to-excitatory recurrent connection strength
-    - **wEI** (dimensionless): Inhibitory-to-excitatory connection strength
-    - **wIE** (dimensionless): Excitatory-to-inhibitory connection strength  
-    - **wII** (dimensionless): Inhibitory-to-inhibitory connection strength
-    - **r** (dimensionless): Refractory parameter affecting maximum activation levels
+    ----------
+    in_size : brainstate.typing.Size
+        Spatial shape of each population (E and I). Can be an int, a tuple of
+        ints, or any size compatible with ``brainstate``.
+    tau_E : brainstate.typing.ArrayLike, optional
+        Excitatory time constant with unit of time (e.g., ``1. * u.ms``).
+        Broadcastable to ``in_size``. Default is ``1. * u.ms``.
+    a_E : brainstate.typing.ArrayLike, optional
+        Excitatory gain (dimensionless). Broadcastable to ``in_size``.
+        Default is ``1.2``.
+    theta_E : brainstate.typing.ArrayLike, optional
+        Excitatory threshold (dimensionless). Broadcastable to ``in_size``.
+        Default is ``2.8``.
+    tau_I : brainstate.typing.ArrayLike, optional
+        Inhibitory time constant with unit of time (e.g., ``1. * u.ms``).
+        Broadcastable to ``in_size``. Default is ``1. * u.ms``.
+    a_I : brainstate.typing.ArrayLike, optional
+        Inhibitory gain (dimensionless). Broadcastable to ``in_size``.
+        Default is ``1.``.
+    theta_I : brainstate.typing.ArrayLike, optional
+        Inhibitory threshold (dimensionless). Broadcastable to ``in_size``.
+        Default is ``4.0``.
+    wEE : brainstate.typing.ArrayLike, optional
+        E→E coupling strength (dimensionless). Broadcastable to ``in_size``.
+        Default is ``12.``.
+    wIE : brainstate.typing.ArrayLike, optional
+        E→I coupling strength (dimensionless). Broadcastable to ``in_size``.
+        Default is ``4.``.
+    wEI : brainstate.typing.ArrayLike, optional
+        I→E coupling strength (dimensionless). Broadcastable to ``in_size``.
+        Default is ``13.``.
+    wII : brainstate.typing.ArrayLike, optional
+        I→I coupling strength (dimensionless). Broadcastable to ``in_size``.
+        Default is ``11.``.
+    r : brainstate.typing.ArrayLike, optional
+        Refractory parameter (dimensionless) that limits maximum activation.
+        Broadcastable to ``in_size``. Default is ``1.``.
+    noise_E : Noise or None, optional
+        Additive noise process for the excitatory population. If provided, its
+        output is added to ``rE_ext`` at each update. Default is ``None``.
+    noise_I : Noise or None, optional
+        Additive noise process for the inhibitory population. If provided, its
+        output is added to ``rI_ext`` at each update. Default is ``None``.
+    rE_init : Callable, optional
+        Initializer for the excitatory state ``rE``. Default is
+        ``brainstate.init.ZeroInit()``.
+    rI_init : Callable, optional
+        Initializer for the inhibitory state ``rI``. Default is
+        ``brainstate.init.ZeroInit()``.
 
-    State Variables
-    ==============
-    - **rE**: Excitatory population activation (dimensionless, normalized firing rate)
-    - **rI**: Inhibitory population activation (dimensionless, normalized firing rate)
+    Attributes
+    ----------
+    rE : brainstate.HiddenState
+        Excitatory population activity (dimensionless). Shape equals
+        ``(batch?,) + in_size`` after ``init_state``.
+    rI : brainstate.HiddenState
+        Inhibitory population activity (dimensionless). Shape equals
+        ``(batch?,) + in_size`` after ``init_state``.
+
+    Notes
+    -----
+    The continuous-time Wilson–Cowan equations are
+
+    .. math::
+
+        \tau_E \frac{dr_E}{dt} = -r_E(t) + \bigl[1 - r\, r_E(t)\bigr]
+        F_E\bigl(w_{EE} r_E(t) - w_{EI} r_I(t) + I_E(t)\bigr),
+
+    .. math::
+
+        \tau_I \frac{dr_I}{dt} = -r_I(t) + \bigl[1 - r\, r_I(t)\bigr]
+        F_I\bigl(w_{IE} r_E(t) - w_{II} r_I(t) + I_I(t)\bigr),
+
+    with the sigmoidal transfer function
+
+    .. math::
+
+        F_j(x) = \frac{1}{1 + e^{-a_j (x - \theta_j)}} - \frac{1}{1 + e^{a_j \theta_j}},\quad j \in \{E, I\}.
 
     References
-    ==========
-    Wilson, H.R. & Cowan, J.D. "Excitatory and inhibitory interactions in localized 
-    populations of model neurons." Biophysical Journal 12, 1–24 (1972).
-
+    ----------
+    Wilson, H. R., & Cowan, J. D. (1972). Excitatory and inhibitory interactions
+    in localized populations of model neurons. Biophysical Journal, 12, 1–24.
     """
 
     def __init__(
@@ -135,27 +180,88 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         self.rI.value = brainstate.init.param(self.rI_init, self.varshape, batch_size)
 
     def F(self, x, a, theta):
+        """Sigmoidal transfer function.
+
+        Parameters
+        ----------
+        x : array-like
+            Input drive.
+        a : array-like
+            Gain (dimensionless), broadcastable to ``x``.
+        theta : array-like
+            Threshold (dimensionless), broadcastable to ``x``.
+
+        Returns
+        -------
+        array-like
+            Output in approximately ``[0, 1]`` (subject to numerical precision),
+            with the same shape as ``x``.
+        """
         return 1 / (1 + jnp.exp(-a * (x - theta))) - 1 / (1 + jnp.exp(a * theta))
 
     def drE(self, rE, rI, ext):
-        """Differential equation for excitatory population."""
+        """Right-hand side for the excitatory population.
+
+        Parameters
+        ----------
+        rE : array-like
+            Excitatory activity (dimensionless).
+        rI : array-like
+            Inhibitory activity (dimensionless), broadcastable to ``rE``.
+        ext : array-like or scalar
+            External input to E (same shape/unit as the model state input).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``drE/dt`` with unit of ``1/time``.
+        """
         xx = self.wEE * rE - self.wIE * rI + ext
         return (-rE + (1 - self.r * rE) * self.F(xx, self.a_E, self.theta_E)) / self.tau_E
 
     def drI(self, rI, rE, ext):
-        """Differential equation for inhibitory population."""
+        """Right-hand side for the inhibitory population.
+
+        Parameters
+        ----------
+        rI : array-like
+            Inhibitory activity (dimensionless).
+        rE : array-like
+            Excitatory activity (dimensionless), broadcastable to ``rI``.
+        ext : array-like or scalar
+            External input to I (same shape/unit as the model state input).
+
+        Returns
+        -------
+        array-like
+            Time derivative ``drI/dt`` with unit of ``1/time``.
+        """
         xx = self.wEI * rE - self.wII * rI + ext
         return (-rI + (1 - self.r * rI) * self.F(xx, self.a_I, self.theta_I)) / self.tau_I
 
     def update(self, rE_ext=None, rI_ext=None):
-        """Update the model state for one time step.
-        
-        Args:
-            rE_ext: External input to excitatory population
-            rI_ext: External input to inhibitory population
-            
-        Returns:
-            Current excitatory population activation
+        """Advance the system by one time step.
+
+        Parameters
+        ----------
+        rE_ext : array-like or scalar or None, optional
+            External input to the excitatory population. If ``None``, treated
+            as zero. If ``noise_E`` is set, its output is added.
+        rI_ext : array-like or scalar or None, optional
+            External input to the inhibitory population. If ``None``, treated
+            as zero. If ``noise_I`` is set, its output is added.
+
+        Returns
+        -------
+        array-like
+            The updated excitatory activity ``rE`` with the same shape as the
+            internal state.
+
+        Notes
+        -----
+        The method performs an exponential-Euler step using
+        ``brainstate.nn.exp_euler_step`` for both populations and updates the
+        internal states ``rE`` and ``rI`` in-place.
         """
         # excitatory input
         rE_ext = 0. if rE_ext is None else rE_ext
@@ -175,3 +281,4 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         self.rE.value = rE
         self.rI.value = rI
         return rE
+
