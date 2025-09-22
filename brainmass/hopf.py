@@ -19,15 +19,16 @@ from typing import Callable
 import brainstate
 import brainunit as u
 
-from .noise import Noise
+from ._common import XY_Oscillator
 from ._typing import Initializer
+from .noise import Noise
 
 __all__ = [
     'HopfOscillator',
 ]
 
 
-class HopfOscillator(brainstate.nn.Dynamics):
+class HopfOscillator(XY_Oscillator):
     r"""Normal-form Hopf oscillator (two-dimensional rate model).
 
     This model implements the supercritical Hopf normal form for a single node
@@ -104,41 +105,21 @@ class HopfOscillator(brainstate.nn.Dynamics):
         # initialization
         init_x: Callable = brainstate.init.ZeroInit(),
         init_y: Callable = brainstate.init.ZeroInit(),
+        method: str = 'exp_euler',
     ):
-        super().__init__(in_size=in_size)
+        super().__init__(
+            in_size,
+            noise_x=noise_x,
+            noise_y=noise_y,
+            init_x=init_x,
+            init_y=init_y,
+            method=method,
+        )
 
         self.a = brainstate.init.param(a, self.varshape)
         self.w = brainstate.init.param(w, self.varshape)
         self.K_gl = brainstate.init.param(K_gl, self.varshape)
         self.beta = brainstate.init.param(beta, self.varshape)
-        self.noise_x = noise_x
-        self.noise_y = noise_y
-        self.init_x = init_x
-        self.init_y = init_y
-
-    def init_state(self, batch_size=None, **kwargs):
-        """Initialize oscillator states to zero.
-
-        Parameters
-        ----------
-        batch_size : int or None, optional
-            Optional leading batch dimension. If ``None``, no batch dimension is
-            used. Default is ``None``.
-        """
-        self.x = brainstate.HiddenState(brainstate.init.param(self.init_x, self.varshape, batch_size))
-        self.y = brainstate.HiddenState(brainstate.init.param(self.init_y, self.varshape, batch_size))
-
-    def reset_state(self, batch_size=None, **kwargs):
-        """Reset oscillator states to zero.
-
-        Parameters
-        ----------
-        batch_size : int or None, optional
-            Batch dimension to reset with. If ``None``, keeps current batch
-            shape but resets values. Default is ``None``.
-        """
-        self.x.value = brainstate.init.param(self.init_x, self.varshape, batch_size)
-        self.y.value = brainstate.init.param(self.init_y, self.varshape, batch_size)
 
     def dx(self, x, y, inp):
         """Right-hand side for ``x``.
@@ -181,38 +162,3 @@ class HopfOscillator(brainstate.nn.Dynamics):
         r = x ** 2 + y ** 2
         dy_dt = (self.a - self.beta * r) * y + self.w * x + inp
         return dy_dt / u.ms
-
-    def update(self, ext_x=None, ext_y=None):
-        """Advance the oscillator by one time step.
-
-        Parameters
-        ----------
-        ext_x : array-like or scalar or None, optional
-            External drive to ``x`` (in addition to ``coupled_x``). If ``None``,
-            treated as zero. If ``noise_x`` is set, its output is added.
-        ext_y : array-like or scalar or None, optional
-            External drive to ``y`` (in addition to ``coupled_y``). If ``None``,
-            treated as zero. If ``noise_y`` is set, its output is added.
-
-        Notes
-        -----
-        Uses an exponential-Euler step via ``brainstate.nn.exp_euler_step`` for
-        each component.
-        """
-        ext_x = 0. if ext_x is None else ext_x
-        ext_y = 0. if ext_y is None else ext_y
-
-        # add noise
-        if self.noise_x is not None:
-            assert isinstance(self.noise_y, Noise), "noise_y must be an Noise if noise_x is not None"
-            ext_x += self.noise_x()
-
-        if self.noise_y is not None:
-            assert isinstance(self.noise_x, Noise), "noise_x must be an v if noise_y is not None"
-            ext_y += self.noise_y()
-
-        x_next = brainstate.nn.exp_euler_step(self.dx, self.x.value, self.y.value, ext_x)
-        y_next = brainstate.nn.exp_euler_step(self.dy, self.y.value, self.x.value, ext_y)
-        self.x.value = x_next
-        self.y.value = y_next
-        return x_next

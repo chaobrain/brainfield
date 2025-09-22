@@ -16,9 +16,9 @@
 from typing import Callable
 
 import brainstate
-import braintools
 import brainunit as u
 
+from ._common import XY_Oscillator
 from ._typing import Initializer
 from .noise import Noise
 
@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-class VanDerPolOscillator(brainstate.nn.Dynamics):
+class VanDerPolOscillator(XY_Oscillator):
     r"""Van der Pol oscillator (two-dimensional form).
 
      In the study of dynamical systems, the van der Pol oscillator
@@ -135,45 +135,17 @@ class VanDerPolOscillator(brainstate.nn.Dynamics):
         init_y: Callable = brainstate.init.Uniform(0, 0.05),
         method: str = 'exp_euler',
     ):
-        super().__init__(in_size=in_size)
+        super().__init__(
+            in_size,
+            noise_x=noise_x,
+            noise_y=noise_y,
+            init_x=init_x,
+            init_y=init_y,
+            method=method,
+        )
 
         # model parameters
         self.mu = brainstate.init.param(mu, self.varshape)
-
-        # initializers
-        assert isinstance(noise_x, Noise) or noise_x is None, "noise_x must be a Noise instance or None."
-        assert isinstance(noise_y, Noise) or noise_y is None, "noise_y must be a Noise instance or None."
-        assert callable(noise_x), "noise_x must be a callable."
-        assert callable(noise_y), "noise_y must be a callable."
-        self.init_x = init_x
-        self.init_y = init_y
-        self.noise_x = noise_x
-        self.noise_y = noise_y
-        self.method = method
-
-    def init_state(self, batch_size=None, **kwargs):
-        """Initialize model states ``x`` and ``y``.
-
-        Parameters
-        ----------
-        batch_size : int or None, optional
-            Optional leading batch dimension. If ``None``, no batch dimension is
-            used. Default is ``None``.
-        """
-        self.x = brainstate.HiddenState(brainstate.init.param(self.init_x, self.varshape, batch_size))
-        self.y = brainstate.HiddenState(brainstate.init.param(self.init_y, self.varshape, batch_size))
-
-    def reset_state(self, batch_size=None, **kwargs):
-        """Reset model states ``x`` and ``y`` using the initializers.
-
-        Parameters
-        ----------
-        batch_size : int or None, optional
-            Optional batch dimension for reinitialization. If ``None``, keeps
-            current batch shape but resets values. Default is ``None``.
-        """
-        self.x.value = brainstate.init.param(self.init_x, self.varshape, batch_size)
-        self.y.value = brainstate.init.param(self.init_y, self.varshape, batch_size)
 
     def dx(self, x, y, inp):
         """Right-hand side for the state ``x``.
@@ -241,44 +213,3 @@ class VanDerPolOscillator(brainstate.nn.Dynamics):
         dVdt = self.dx(V, w, x_inp)
         dwdt = self.dy(w, V, y_inp)
         return (dVdt, dwdt)
-
-    def update(self, x_inp=None, y_inp=None):
-        """Advance the oscillator by one time step.
-
-        Parameters
-        ----------
-        x_inp : array-like or scalar or None, optional
-            External input to ``x``. If ``None``, treated as zero. If
-            ``noise_x`` is set, its output is added. Default is ``None``.
-        y_inp : array-like or scalar or None, optional
-            External input to ``y``. If ``None``, treated as zero. If
-            ``noise_y`` is set, its output is added. Default is ``None``.
-
-        Returns
-        -------
-        array-like
-            The updated state ``x`` with the same shape as the internal state.
-
-        Notes
-        -----
-        - For ``method='exp_euler'`` uses ``brainstate.nn.exp_euler_step`` to
-          update each component.
-        - Otherwise, dispatches to the corresponding integrator under
-          ``braintools.quad`` (e.g., RK4), using :meth:`derivative`.
-        """
-        x_inp = 0. if x_inp is None else x_inp
-        y_inp = 0. if y_inp is None else y_inp
-        if self.noise_x is not None:
-            x_inp = x_inp + self.noise_x()
-        if self.noise_y is not None:
-            y_inp = y_inp + self.noise_y()
-        if self.method == 'exp_euler':
-            x = brainstate.nn.exp_euler_step(self.dx, self.x.value, self.y.value, x_inp)
-            y = brainstate.nn.exp_euler_step(self.dy, self.y.value, self.x.value, y_inp)
-        else:
-            method = getattr(braintools.quad, f'ode_{self.method}_step')
-            x, y = method(self.derivative, (self.x.value, self.y.value), 0 * u.ms, x_inp, y_inp)
-        self.x.value = x
-        self.y.value = y
-        return x
-
