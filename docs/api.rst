@@ -92,7 +92,7 @@ Example (Wilson–Cowan):
     JansenRitModel
     WilsonCowanModel
     WongWangModel
-    HopfModel
+    HopfOscillator
     FitzHughNagumoModel
     ThresholdLinearModel
 

@@ -23,11 +23,11 @@ from .noise import Noise
 from ._typing import Initializer
 
 __all__ = [
-    'HopfModel',
+    'HopfOscillator',
 ]
 
 
-class HopfModel(brainstate.nn.Dynamics):
+class HopfOscillator(brainstate.nn.Dynamics):
     r"""Normal-form Hopf oscillator (two-dimensional rate model).
 
     This model implements the supercritical Hopf normal form for a single node
