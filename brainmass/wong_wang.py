@@ -86,6 +86,7 @@ class WongWangModel(brainstate.nn.Dynamics):
         - $\mu_0$ = 30 Hz : Baseline external input rate
         - $c \in [-1, 1]$ : Motion coherence (stimulus strength)
 
+
     Network Behavior
     ================
     
@@ -94,7 +95,7 @@ class WongWangModel(brainstate.nn.Dynamics):
     1. **Spontaneous State**: At c=0 (no coherence), both populations have equal 
        activity, representing uncertainty.
        
-    2. **Decision State**: For |c| > 0, one population gradually wins the competition,
+    2. **Decision State**: For $|c| > 0$, one population gradually wins the competition,
        representing a perceptual choice.
        
     3. **Bistability**: The network can exhibit bistable attractor dynamics where
@@ -102,6 +103,7 @@ class WongWangModel(brainstate.nn.Dynamics):
        
     4. **Integration Time**: The slow NMDA dynamics ($\tau_S$ = 100ms) enable temporal
        integration of sensory evidence over hundreds of milliseconds.
+
 
     Usage Example
     =============
