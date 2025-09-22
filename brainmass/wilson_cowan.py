@@ -75,10 +75,10 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         Broadcastable to ``in_size``. Default is ``1.``.
     noise_E : Noise or None, optional
         Additive noise process for the excitatory population. If provided, its
-        output is added to ``rE_ext`` at each update. Default is ``None``.
+        output is added to ``rE_inp`` at each update. Default is ``None``.
     noise_I : Noise or None, optional
         Additive noise process for the inhibitory population. If provided, its
-        output is added to ``rI_ext`` at each update. Default is ``None``.
+        output is added to ``rI_inp`` at each update. Default is ``None``.
     rE_init : Callable, optional
         Initializer for the excitatory state ``rE``. Default is
         ``brainstate.init.ZeroInit()``.
@@ -240,15 +240,15 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         xx = self.wEI * rE - self.wII * rI + ext
         return (-rI + (1 - self.r * rI) * self.F(xx, self.a_I, self.theta_I)) / self.tau_I
 
-    def update(self, rE_ext=None, rI_ext=None):
+    def update(self, rE_inp=None, rI_inp=None):
         """Advance the system by one time step.
 
         Parameters
         ----------
-        rE_ext : array-like or scalar or None, optional
+        rE_inp : array-like or scalar or None, optional
             External input to the excitatory population. If ``None``, treated
             as zero. If ``noise_E`` is set, its output is added.
-        rI_ext : array-like or scalar or None, optional
+        rI_inp : array-like or scalar or None, optional
             External input to the inhibitory population. If ``None``, treated
             as zero. If ``noise_I`` is set, its output is added.
 
@@ -265,20 +265,20 @@ class WilsonCowanModel(brainstate.nn.Dynamics):
         internal states ``rE`` and ``rI`` in-place.
         """
         # excitatory input
-        rE_ext = 0. if rE_ext is None else rE_ext
-        rI_ext = 0. if rI_ext is None else rI_ext
+        rE_inp = 0. if rE_inp is None else rE_inp
+        rI_inp = 0. if rI_inp is None else rI_inp
         if self.noise_E is not None:
-            rE_ext = rE_ext + self.noise_E()
-        rE_ext = self.sum_delta_inputs(rE_ext, label='E')
+            rE_inp = rE_inp + self.noise_E()
+        rE_inp = self.sum_delta_inputs(rE_inp, label='E')
 
         # inhibitory input
         if self.noise_I is not None:
-            rI_ext = rI_ext + self.noise_I()
-        rI_ext = self.sum_delta_inputs(rI_ext, label='I')
+            rI_inp = rI_inp + self.noise_I()
+        rI_inp = self.sum_delta_inputs(rI_inp, label='I')
 
         # update the state variables
-        rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_ext)
-        rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_ext)
+        rE = brainstate.nn.exp_euler_step(self.drE, self.rE.value, self.rI.value, rE_inp)
+        rI = brainstate.nn.exp_euler_step(self.drI, self.rI.value, self.rE.value, rI_inp)
         self.rE.value = rE
         self.rI.value = rI
         return rE
