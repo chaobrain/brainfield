@@ -228,3 +228,4 @@ cython_debug/
 /.claude/
 /CLAUDE.md
 /dev/
+/docs/changelog.md
