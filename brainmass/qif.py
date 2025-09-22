@@ -59,8 +59,8 @@ class QIF(brainstate.nn.Dynamics):
         Mean of the Lorentzian excitability distribution (dimensionless).
         Default is ``-5.0``.
     delta : Initializer, optional
-        HWHM of the Lorentzian excitability distribution (dimensionless).
-        Default is ``1.0``.
+        HWHM of the Lorentzian excitability distribution.
+        Default is ``1.0 * u.Hz``.
     J : Initializer, optional
         Recurrent coupling strength (dimensionless). Default is ``15.``.
     init_r : Callable, optional
@@ -121,7 +121,7 @@ class QIF(brainstate.nn.Dynamics):
         # model parameters
         tau: Initializer = 1. * u.ms,
         eta: Initializer = -5.0,
-        delta: Initializer = 1.0,
+        delta: Initializer = 1.0 * u.Hz,
         J: Initializer = 15.,
 
         # initializers
