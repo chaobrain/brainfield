@@ -17,8 +17,6 @@
 __version_info__ = (0, 0, 4)
 __version__ = "0.0.4"
 
-from .vdp import *
-from .vdp import __all__ as vdp_all
 from .coupling import *
 from .coupling import __all__ as coupling_all
 from .fhn import *
@@ -35,6 +33,8 @@ from .noise import *
 from .noise import __all__ as noise_all
 from .param import *
 from .param import __all__ as param_all
+from .vdp import *
+from .vdp import __all__ as vdp_all
 from .wilson_cowan import *
 from .wilson_cowan import __all__ as wilson_cowan_all
 from .wong_wang import *
