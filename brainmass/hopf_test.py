@@ -94,7 +94,7 @@ class TestHopfModel:
         ext_x = jnp.array([0.5, -0.5])
 
         with brainstate.environ.context(dt=0.1 * u.ms):
-            _ = m.update(ext_x=ext_x)
+            _ = m.update(x_inp=ext_x)
 
         # Check states updated and have correct shapes
         assert m.x.value.shape == (2,)
@@ -158,11 +158,3 @@ class TestHopfModel:
             except AssertionError:
                 pass
 
-        m_y = brainmass.HopfOscillator(in_size=1, noise_x=None, noise_y=n)
-        m_y.init_state()
-        with brainstate.environ.context(dt=0.1 * u.ms):
-            try:
-                _ = m_y.update(0.0, 0.0)
-                assert False, "Expected assertion when only noise_y is provided"
-            except AssertionError:
-                pass

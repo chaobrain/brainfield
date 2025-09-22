@@ -26,9 +26,10 @@ and coupling, then transform model observables to measurements via a forward mod
 
 .. code-block:: python
 
-   import brainunit as u
    import jax.numpy as jnp
+   import brainunit as u
    import brainmass
+   import brainstate
 
    # 1) Choose a neural mass model (single region here)
    nmm = brainmass.WilsonCowanModel(in_size=1)
@@ -41,16 +42,13 @@ and coupling, then transform model observables to measurements via a forward mod
    nmm.noise_I = noise_I
 
    # 3) Simulate a few steps
-   ts = []
-   for _ in range(1000):
-       rE = nmm.update()  # returns updated excitatory activity
-       ts.append(rE)
+   ts = brainstate.transform.for_loop(lambda i: nmm.update(), jnp.arange(1000))
 
    # 4) Map node observable to a BOLD signal (per region)
    bold = brainmass.BOLDSignal(in_size=1)
    bold.init_state()
-   for r in ts:
-       bold.update(z=r)  # pass a neural activity proxy (e.g., rate)
+   # pass a neural activity proxy (e.g., rate)
+   brainstate.transform.for_loop(lambda r: bold.update(z=r), ts)
    y_bold = bold.bold()  # Quantity with BOLD units
 
    # 5) EEG/MEG sensor mapping via a lead-field model
@@ -95,6 +93,7 @@ Example (Wilson–Cowan):
     FitzHughNagumoModel
     ThresholdLinearModel
     KuramotoModel
+    QIFModel
     HopfOscillator
     VanDerPolOscillator
     StuartLandauOscillator

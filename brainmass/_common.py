@@ -45,8 +45,8 @@ class XY_Oscillator(brainstate.nn.Dynamics):
         # initializers
         assert isinstance(noise_x, Noise) or noise_x is None, "noise_x must be a Noise instance or None."
         assert isinstance(noise_y, Noise) or noise_y is None, "noise_y must be a Noise instance or None."
-        assert callable(noise_x), "noise_x must be a callable."
-        assert callable(noise_y), "noise_y must be a callable."
+        assert callable(init_x), "init_x must be a callable."
+        assert callable(init_y), "init_y must be a callable."
         self.init_x = init_x
         self.init_y = init_y
         self.noise_x = noise_x
